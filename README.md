@@ -8,7 +8,7 @@ The camera stays on the same network as the PC. Nothing in this project signs in
 
 ## Install on Windows
 
-Download **V380SdSync-Setup.exe** from [Releases](https://github.com/torrefrancae/v380-sd-card-pc-sync/releases).
+Download **V380SdSync-Setup.exe** from the [latest release](https://github.com/torrefrancae/v380-sd-card-pc-sync/releases/latest/download/V380SdSync-Setup.exe). The steps for users, including the browser warning for this unsigned installer, are in [INSTALL.md](INSTALL.md).
 
 The installer does not need administrator rights. It places the app in the user profile, adds a Start menu and desktop shortcut, and opens the setup page. Node.js and ffmpeg are inside the installer. If ffmpeg is missing on a Windows PC, the first open downloads it into the app folder.
 
@@ -96,6 +96,7 @@ ffmpeg is shipped as a separate program. Its license file is copied into the ins
 | `src/media.ts` | Saved clips, playback, and folder open |
 | `public/index.html` | Setup page and file list |
 | `public/watch.html` | Clip player |
+| `INSTALL.md` | Steps a Windows user follows to install |
 | `installer/` | Inno Setup script and silent launcher |
 | `.github/workflows/windows-installer.yml` | Builds the downloadable setup |
 

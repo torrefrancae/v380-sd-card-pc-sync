@@ -1,0 +1,44 @@
+# Install V380 SD sync on Windows
+
+This installs the program that copies V380 SD card recordings to MP4 files on this PC. The camera and the PC must be on the same network.
+
+The setup file is not signed by Microsoft. The browser and Windows warn about that. Choose the keep and run options below. The file is the latest installer from this project:
+
+[Download V380SdSync-Setup.exe](https://github.com/torrefrancae/v380-sd-card-pc-sync/releases/latest/download/V380SdSync-Setup.exe)
+
+## If the browser blocks the download
+
+Edge and Chrome often stop an installer that is not a commonly downloaded, signed Windows app.
+
+In **Edge**:
+
+1. Open the download bar.
+2. Click the three dots next to `V380SdSync-Setup.exe`.
+3. Choose **Keep**.
+4. If a second prompt appears, choose **Keep anyway**.
+
+In **Chrome**:
+
+1. Open the download list.
+2. Choose **Keep** next to the blocked file.
+3. If Chrome asks again, choose **Keep anyway**.
+
+## If Windows blocks the file when you open it
+
+Windows SmartScreen can show **Windows protected your PC**.
+
+1. Click **More info**.
+2. Click **Run anyway**.
+
+## Setup
+
+1. Run `V380SdSync-Setup.exe`. It does not ask for an administrator password.
+2. The setup page opens at [http://127.0.0.1:8787](http://127.0.0.1:8787). If it does not, open that address in Edge or Chrome.
+3. Click **Find on network** and select the camera. **Scan V380** is only for a PC that already has the V380 app installed and signed in.
+4. Enter the camera **device username** and **device password**. This is not the V380 account email or account password.
+5. Click **Save camera**, or click **Start download**. Starting a download saves the camera on this PC.
+6. The page becomes a file list. The newest day is open. Older days stay closed until you open them.
+
+The next time, choose the camera under **Saved cameras**. Closing the page leaves the download running. **Stop** is what ends it.
+
+A desktop and Start menu shortcut named **V380 SD Sync** opens the page again.
