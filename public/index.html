@@ -37,6 +37,7 @@
     .file:hover, .file.playing { background: #f7f1e7; }
     .file.playing { background: #fff4e8; }
     .file button.text { color: #9a3412; }
+    .file.removed button.text, .file.removed .when { color: #8a8175; text-decoration: line-through; text-decoration-thickness: 1.5px; }
     .when { color: #5c564c; font-variant-numeric: tabular-nums; }
     .progress { display: flex; align-items: center; gap: 6px; color: #5c564c; font-size: 13px; font-variant-numeric: tabular-nums; }
     .remark, .note { color: #6b645b; font-size: 13px; }
@@ -573,7 +574,8 @@
         if (open) {
           for (const file of groups.get(day).slice().sort(byRecent)) {
             const row = document.createElement("div");
-            row.className = file === viewingFile ? "file playing" : "file";
+            const gone = removedFiles.has(file);
+            row.className = "file" + (file === viewingFile ? " playing" : "") + (gone ? " removed" : "");
             const onDisk = savedNames.has(file);
             const live = file === current && !onDisk && !removedFiles.has(file);
             const link = clipButton(file);
