@@ -97,11 +97,22 @@
     .warn, .alert { background: #fff4e8; border: 1px solid #e7c7a4; border-radius: 12px; padding: 10px 12px; }
     .warn { margin-bottom: 14px; }
     .alert { margin-top: 14px; color: #7a3b22; font-size: 13px; font-weight: 650; }
+    #found-box.lit { margin-top: 8px; background: #fff7f2; border: 1px solid #e7b089; border-radius: 16px; padding: 12px 12px 14px; box-shadow: inset 4px 0 0 var(--accent); }
+    #found-box.lit h2 { color: #9a3412; }
+    .cameras > button.found-camera { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 10px; align-items: center; }
+    .cameras > button.found-camera svg { grid-row: 1 / span 2; width: 28px; height: 28px; color: var(--accent); }
+    .found-name { font-weight: 680; }
+    .found-where { color: var(--muted); font-size: 13px; }
     @media (max-width: 1100px) {
       .workspace, .workspace.watching, .row { grid-template-columns: 1fr; }
       .cols, .day-head, .file { grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) 56px minmax(0, 0.9fr) 72px; }
       .reveal { padding: 4px 8px; }
     }
+    .workspace.full { position: fixed; inset: 0; z-index: 30; grid-template-columns: minmax(0, 1fr); gap: 0; padding: 12px; background: #111; }
+    .workspace.full aside, .workspace.full #panel { display: none; }
+    .workspace.full #viewer { height: 100%; margin: 0; background: #111; color: #fff; border: 0; box-shadow: none; display: flex; flex-direction: column; }
+    .workspace.full #viewer-title, .workspace.full #viewer-note { color: #fff; }
+    .workspace.full #viewer video, .workspace.full #viewer img { flex: 1; width: 100%; max-height: none; height: calc(100vh - 92px); }
   </style>
 </head>
 <body>
@@ -118,8 +129,10 @@
           <button type="button" id="find">Find on network</button>
           <button type="button" id="scan" class="secondary">Scan V380</button>
         </div>
-        <h2>Not saved yet</h2>
-        <div id="found" class="cameras"></div>
+        <div id="found-box">
+          <h2 id="found-title">Not saved yet</h2>
+          <div id="found" class="cameras"></div>
+        </div>
       </aside>
       <section class="panel" id="panel">
         <div class="panel-bar">
@@ -229,6 +242,7 @@
         <div class="panel-bar">
           <h2 id="viewer-title">Clip</h2>
           <div class="actions">
+            <button type="button" id="viewer-full" class="secondary">Full screen</button>
             <button type="button" id="viewer-close" class="secondary">Close</button>
           </div>
         </div>
@@ -248,6 +262,7 @@
     const viewerTitle = document.querySelector("#viewer-title");
     const viewerNote = document.querySelector("#viewer-note");
     const viewerClose = document.querySelector("#viewer-close");
+    const viewerFull = document.querySelector("#viewer-full");
     const player = document.querySelector("#player");
     const liveView = document.querySelector("#live-view");
     const panelTitle = document.querySelector("#panel-title");
@@ -280,6 +295,7 @@
     let playToken = 0;
     let playAbort = null;
     let halted = false;
+    let writingUrl = false;
 
     function setBusy(on, text) {
       busy = on;
@@ -331,6 +347,7 @@
       liveView.hidden = false;
       liveView.src = "/api/live?id=" + encodeURIComponent(camera.id) + "&t=" + Date.now();
       if (showingFiles) renderExplorer();
+      rememberView("live");
     }
 
     function playable(codec) {
@@ -348,9 +365,10 @@
       workspace.classList.add("watching");
       viewerTitle.textContent = file;
       viewerNote.hidden = false;
+      rememberView("clip");
     }
 
-    async function closeViewer() {
+    async function closeViewer(keepUrl) {
       playToken += 1;
       playAbort?.abort();
       playAbort = null;
@@ -358,9 +376,12 @@
       stopPlayer();
       stopLive();
       viewer.hidden = true;
-      workspace.classList.remove("watching", "live");
+      workspace.classList.remove("watching", "live", "full");
+      viewerFull.textContent = "Full screen";
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
       fetch("/api/preview/cancel", { method: "POST" }).catch(() => undefined);
       if (showingFiles) renderExplorer();
+      if (!keepUrl) rememberView(showingFiles ? "files" : "settings");
     }
 
     async function openViewer(file) {
@@ -475,8 +496,57 @@
       }
     }
 
+    function rememberView(view, replace) {
+      if (writingUrl || !view) return;
+      const params = new URLSearchParams();
+      params.set("view", view);
+      const id = Number(form.deviceId.value);
+      if (id) params.set("camera", String(id));
+      if (view === "clip" && viewingFile) params.set("file", viewingFile);
+      if ((view === "live" || view === "clip") && workspace.classList.contains("full")) params.set("full", "1");
+      const next = "?" + params.toString();
+      if (location.search === next) return;
+      if (replace) history.replaceState({ view }, "", next);
+      else history.pushState({ view }, "", next);
+    }
+
+    function setFull(on, persist) {
+      workspace.classList.toggle("full", on);
+      viewerFull.textContent = on ? "Exit full screen" : "Full screen";
+      if (persist) {
+        if (on) viewer.requestFullscreen?.().catch(() => undefined);
+        else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
+      }
+    }
+
+    function savedCameraCard(id) {
+      return [...saved.querySelectorAll(".camera-card")].find((card) => card.camera && Number(card.camera.id) === Number(id));
+    }
+
+    async function applyRoute() {
+      const params = new URLSearchParams(location.search);
+      const view = params.get("view");
+      if (!view) return;
+      writingUrl = true;
+      try {
+        await loadSaved();
+        const card = savedCameraCard(params.get("camera"));
+        if (card) selectCamera(card.camera, card);
+        if (view === "settings") showForm();
+        if (view === "files" || view === "clip") {
+          showFiles();
+          await loadClips();
+        }
+        if (view === "live" && card) showLive(card.camera);
+        if (view === "clip" && params.get("file")) await openViewer(params.get("file"));
+        if (params.get("full") === "1" && !viewer.hidden) setFull(true, false);
+      } finally {
+        writingUrl = false;
+      }
+    }
+
     function showFiles() {
-      if (workspace.classList.contains("live")) closeViewer();
+      if (workspace.classList.contains("live")) closeViewer(true);
       showingFiles = true;
       form.hidden = true;
       explorer.hidden = false;
@@ -484,16 +554,18 @@
       settings.hidden = false;
       settings.textContent = "Settings";
       renderExplorer();
+      rememberView("files");
     }
 
     function showForm() {
-      if (workspace.classList.contains("live")) closeViewer();
+      if (workspace.classList.contains("live")) closeViewer(true);
       showingFiles = false;
       form.hidden = false;
       explorer.hidden = true;
       panelTitle.textContent = "Setup";
       settings.hidden = false;
       settings.textContent = "Files";
+      rememberView("settings");
     }
 
     function byRecent(a, b) {
@@ -754,26 +826,35 @@
       return button;
     }
 
-    function cameraButton(camera, label) {
+    function cameraButton(camera) {
       const button = document.createElement("button");
       button.type = "button";
+      button.className = "found-camera";
       button.camera = camera;
-      button.textContent = label;
+      const name = document.createElement("span");
+      name.className = "found-name";
+      name.textContent = camera.name || ("Camera " + camera.id);
+      const where = document.createElement("span");
+      where.className = "found-where";
+      where.textContent = (camera.host || camera.ip || "Not on this network") + " · id " + camera.id;
+      button.append(icon("M4 7h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM17 10.5l5-2.5v8l-5-2.5z"), name, where);
       button.addEventListener("click", () => selectCamera(camera, button));
       return button;
     }
 
     function renderFound() {
+      const box = document.querySelector("#found-box");
+      const title = document.querySelector("#found-title");
       found.replaceChildren();
       if (!foundCameras.length) {
+        box.classList.remove("lit");
+        title.textContent = "Not saved yet";
         emptyNote(found, "Find on network lists cameras that are not saved yet.");
         return;
       }
-      for (const camera of foundCameras) {
-        const where = camera.host || camera.ip || "not on this network";
-        const name = camera.name ? camera.name + "   " : "";
-        found.append(cameraButton(camera, name + where + "   id " + camera.id));
-      }
+      box.classList.add("lit");
+      title.textContent = "Cameras found";
+      for (const camera of foundCameras) found.append(cameraButton(camera));
     }
 
     function renderSaved(cameras) {
@@ -990,6 +1071,18 @@
     });
 
     viewerClose.addEventListener("click", () => closeViewer());
+    viewerFull.addEventListener("click", () => {
+      const on = !workspace.classList.contains("full");
+      setFull(on, true);
+      const view = !viewer.hidden && workspace.classList.contains("live") ? "live" : (viewingFile ? "clip" : (showingFiles ? "files" : "settings"));
+      rememberView(view);
+    });
+    document.addEventListener("fullscreenchange", () => {
+      if (document.fullscreenElement || !workspace.classList.contains("full")) return;
+      setFull(false, false);
+      const view = viewingFile ? "clip" : (workspace.classList.contains("live") ? "live" : (showingFiles ? "files" : "settings"));
+      rememberView(view);
+    });
 
     settings.addEventListener("click", () => {
       if (showingFiles) showForm();
@@ -1063,8 +1156,9 @@
     }).catch(() => undefined).finally(() => {
       keepLoaded = true;
     });
-    loadSaved();
+    loadSaved().then(() => applyRoute()).catch(() => undefined);
     renderFound();
+    window.addEventListener("popstate", () => { applyRoute().catch(() => undefined); });
     fetch("/api/status").then((response) => response.json()).then((body) => {
       if (!body.running) return;
       activeFile = body.activeFile || "";
@@ -1072,6 +1166,7 @@
       activePercent = Number.isFinite(body.activePercent) ? body.activePercent : null;
       setBusy(true, "Watching for new clips. Older clips follow.");
       setNote("Watching for new clips.");
+      if (new URLSearchParams(location.search).get("view")) return;
       showFiles();
       loadSaved();
       loadClips();
