@@ -24,8 +24,8 @@ UninstallDisplayIcon={sys}\wscript.exe
 Source: "..\build\win\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch.vbs"""; WorkingDir: "{app}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch.vbs"""; WorkingDir: "{app}"
+Name: "{autoprograms}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\open-when-ready.vbs"""; WorkingDir: "{app}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\open-when-ready.vbs"""; WorkingDir: "{app}"
 
 [Run]
-Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch.vbs"""; Flags: nowait runasoriginaluser
+Filename: "{sys}\wscript.exe"; Parameters: """{app}\open-when-ready.vbs"""; WorkingDir: "{app}"; StatusMsg: "Starting V380 SD Sync. The browser opens when the page is ready. The first start can take a minute."; Flags: runasoriginaluser
