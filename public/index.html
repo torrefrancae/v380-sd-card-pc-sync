@@ -63,7 +63,7 @@
     .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
     button { border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-weight: 650; cursor: pointer; background: #1a1d21; color: #fff; }
     button.secondary { background: #e8edf2; color: #1a1d21; }
-    #start { background: var(--accent); }
+    #start, #applyKeep { background: var(--accent); color: #fff; }
     #settings { background: #fff; color: #1a1d21; border: 1px solid var(--line); }
     button:disabled { opacity: 0.55; cursor: default; }
     .cameras { display: flex; flex-direction: column; gap: 8px; }
@@ -194,12 +194,14 @@
               <option value="months">Months</option>
             </select>
           </div>
+          <div class="field">
+            <button type="button" id="applyKeep">Apply keep</button>
+          </div>
         </fieldset>
         <div class="actions">
           <button type="submit" id="start">Start download</button>
           <button type="button" id="save" class="secondary">Save camera</button>
           <button type="button" id="check" class="secondary">Check login</button>
-          <button type="button" id="applyKeep" class="secondary">Apply keep</button>
           <button type="button" id="remove" class="secondary">Remove</button>
         </div>
         <p id="status" class="status" role="status"></p>
