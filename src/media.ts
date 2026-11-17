@@ -8,6 +8,15 @@ import { appRoot, ffmpegBin } from "./app-root.js";
 const CLIP = /^\d{4}-\d{2}-\d{2}\/\d{6}\.mp4$/;
 const jobs = new Map<string, Promise<void>>();
 const previewErrors = new Map<string, string>();
+let currentPreview: { id: string; child: ReturnType<typeof spawn> } | null = null;
+
+export function cancelPreview() {
+  const running = currentPreview;
+  currentPreview = null;
+  if (!running) return;
+  jobs.delete(running.id);
+  running.child.kill();
+}
 
 export interface SavedClip {
   file: string;
@@ -80,10 +89,12 @@ export async function previewStatus(outDir: string | undefined, file: string): P
   }
   const failed = previewErrors.get(id);
   if (failed) return { ready: false, url: "", message: failed };
+  if (currentPreview && currentPreview.id !== id) cancelPreview();
   if (!jobs.has(id)) {
-    const job = transcode(full, dest)
+    const job = transcode(id, full, dest)
       .catch((error: unknown) => {
-        previewErrors.set(id, error instanceof Error ? error.message : "Could not prepare the clip.");
+        const message = error instanceof Error ? error.message : "Could not prepare the clip.";
+        if (message !== "stopped") previewErrors.set(id, message);
       })
       .finally(() => jobs.delete(id));
     jobs.set(id, job);
@@ -160,7 +171,7 @@ function codecName(file: string): Promise<string> {
   });
 }
 
-function transcode(source: string, dest: string): Promise<void> {
+function transcode(id: string, source: string, dest: string): Promise<void> {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const partial = `${dest}.partial.mp4`;
   return new Promise((resolve, reject) => {
@@ -176,15 +187,17 @@ function transcode(source: string, dest: string): Promise<void> {
       "-movflags", "+faststart",
       partial,
     ], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
+    currentPreview = { id, child };
     let error = "";
     child.stderr.on("data", (chunk: Buffer) => {
       error += chunk.toString("utf8");
     });
     child.on("error", reject);
     child.on("close", (code) => {
+      if (currentPreview?.child === child) currentPreview = null;
       if (code !== 0) {
         fs.rmSync(partial, { force: true });
-        reject(new Error(error.trim() || `ffmpeg exited ${code}`));
+        reject(new Error(code === null ? "stopped" : error.trim() || `ffmpeg exited ${code}`));
         return;
       }
       fs.renameSync(partial, dest);

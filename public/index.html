@@ -11,11 +11,12 @@
     header { height: 3px; background: #e4dfd4; }
     header.busy { background: linear-gradient(90deg, #c4552a 0%, #e7b089 50%, #c4552a 100%); background-size: 200% 100%; animation: slide 1s linear infinite; }
     @keyframes slide { from { background-position: 0 0; } to { background-position: 200% 0; } }
-    main { max-width: 1120px; margin: 0 auto; padding: 28px 20px 48px; }
+    main { max-width: 1480px; margin: 0 auto; padding: 28px 20px 48px; }
     h1 { font-size: 28px; font-weight: 650; margin: 0 0 8px; }
     h2 { font-size: 15px; margin: 0 0 8px; }
     p.lead { margin: 0 0 22px; max-width: 62ch; color: #5c564c; }
-    .workspace { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+    .workspace { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 18px; align-items: start; }
+    .workspace.watching { grid-template-columns: 240px minmax(0, 1fr) minmax(300px, 420px); }
     aside, .panel { background: #fffdf8; border: 1px solid #e4d9c8; border-radius: 16px; padding: 16px 16px 18px; box-shadow: 0 10px 30px rgba(60, 42, 20, 0.05); }
     form { margin: 0; }
     .panel-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -32,7 +33,9 @@
     .mark { width: 14px; text-align: center; color: #8a8175; }
     .reveal { padding: 4px 10px; font-size: 13px; }
     .file { margin: 0; padding: 5px 8px 5px 30px; border-radius: 8px; }
-    .file:hover { background: #f7f1e7; }
+    .file:hover, .file.playing { background: #f7f1e7; }
+    .file.playing { background: #fff4e8; }
+    .file button.text { color: #9a3412; }
     .when { color: #5c564c; font-variant-numeric: tabular-nums; }
     .progress { display: flex; align-items: center; gap: 6px; color: #5c564c; font-size: 13px; font-variant-numeric: tabular-nums; }
     .remark, .note { color: #6b645b; font-size: 13px; }
@@ -56,10 +59,11 @@
     .cameras button[aria-pressed="true"] { border-color: #c4552a; }
     .empty { margin: 0; color: #6b645b; font-size: 13px; }
     .status { min-height: 1.2em; margin: 10px 0 0; color: #6b4a32; }
-    .file a { color: #9a3412; }
+    #viewer video { width: 100%; max-height: 70vh; background: #111; border-radius: 10px; }
+    #viewer-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .warn { background: #fff4e8; border: 1px solid #e7c7a4; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
-    @media (max-width: 800px) {
-      .workspace, .row { grid-template-columns: 1fr; }
+    @media (max-width: 1100px) {
+      .workspace, .workspace.watching, .row { grid-template-columns: 1fr; }
       .cols, .day-head, .file { grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) 64px 56px 72px; }
       .reveal { padding: 4px 8px; }
     }
@@ -154,6 +158,16 @@
       <p id="note" class="note" hidden></p>
       <div id="explorer" hidden></div>
       </section>
+      <section class="panel" id="viewer" hidden>
+        <div class="panel-bar">
+          <h2 id="viewer-title">Clip</h2>
+          <div class="actions">
+            <button type="button" id="viewer-close" class="secondary">Close</button>
+          </div>
+        </div>
+        <p id="viewer-note" class="note"></p>
+        <video id="player" controls></video>
+      </section>
     </div>
   </main>
   <script>
@@ -161,6 +175,12 @@
     const status = document.querySelector("#status");
     const note = document.querySelector("#note");
     const explorer = document.querySelector("#explorer");
+    const workspace = document.querySelector(".workspace");
+    const viewer = document.querySelector("#viewer");
+    const viewerTitle = document.querySelector("#viewer-title");
+    const viewerNote = document.querySelector("#viewer-note");
+    const viewerClose = document.querySelector("#viewer-close");
+    const player = document.querySelector("#player");
     const panelTitle = document.querySelector("#panel-title");
     const settings = document.querySelector("#settings");
     const saved = document.querySelector("#saved");
@@ -186,6 +206,9 @@
     const closedDays = new Set();
     const remarks = new Map();
     let keepLoaded = false;
+    let viewingFile = "";
+    let playToken = 0;
+    let playAbort = null;
 
     function setBusy(on, text) {
       busy = on;
@@ -201,13 +224,101 @@
       status.textContent = text || "";
     }
 
-    function clipLink(file) {
-      const link = document.createElement("a");
-      link.href = "/watch?" + new URLSearchParams({ file, outDir: form.outDir.value });
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = file;
-      return link;
+    function clipButton(file) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "text";
+      button.textContent = file.slice(file.indexOf("/") + 1);
+      button.addEventListener("click", () => openViewer(file));
+      return button;
+    }
+
+    function stopPlayer() {
+      player.pause();
+      player.removeAttribute("src");
+      player.load();
+    }
+
+    function playable(codec) {
+      if (codec !== "hevc" && codec !== "h265") return true;
+      const probe = document.createElement("video");
+      return probe.canPlayType('video/mp4; codecs="hvc1.1.6.L120.B0"') !== "" || probe.canPlayType('video/mp4; codecs="hev1.1.6.L120.B0"') !== "";
+    }
+
+    function showViewer(file) {
+      viewingFile = file;
+      viewer.hidden = false;
+      workspace.classList.add("watching");
+      viewerTitle.textContent = file;
+      viewerNote.hidden = false;
+    }
+
+    async function closeViewer() {
+      playToken += 1;
+      playAbort?.abort();
+      playAbort = null;
+      viewingFile = "";
+      stopPlayer();
+      viewer.hidden = true;
+      workspace.classList.remove("watching");
+      fetch("/api/preview/cancel", { method: "POST" }).catch(() => undefined);
+      if (showingFiles) renderExplorer();
+    }
+
+    async function openViewer(file) {
+      const token = ++playToken;
+      playAbort?.abort();
+      const abort = new AbortController();
+      playAbort = abort;
+      stopPlayer();
+      showViewer(file);
+      viewerNote.textContent = "Opening the clip...";
+      if (showingFiles) renderExplorer();
+      const params = new URLSearchParams({ file, outDir: form.outDir.value });
+      try {
+        await fetch("/api/preview/cancel", { method: "POST", signal: abort.signal });
+        if (token !== playToken) return;
+        const response = await fetch("/api/clip?" + params, { signal: abort.signal });
+        const body = await response.json();
+        if (token !== playToken) return;
+        if (!response.ok) throw new Error(body.error || "Could not open the clip");
+        if (!body.exists) {
+          viewerNote.textContent = body.message;
+          return;
+        }
+        if (playable(body.codec)) {
+          viewerNote.hidden = true;
+          player.src = body.media;
+          player.play().catch(() => undefined);
+          return;
+        }
+        viewerNote.textContent = "Preparing a copy this browser can play. This happens once per clip.";
+        for (;;) {
+          if (token !== playToken) return;
+          const preview = await fetch("/api/preview?" + params, { signal: abort.signal });
+          const prepared = await preview.json();
+          if (token !== playToken) return;
+          if (!preview.ok) throw new Error(prepared.error || "Could not prepare the clip");
+          if (prepared.ready) {
+            viewerNote.hidden = true;
+            player.src = prepared.url;
+            player.play().catch(() => undefined);
+            return;
+          }
+          if (prepared.message) viewerNote.textContent = prepared.message;
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(resolve, 1000);
+            abort.signal.addEventListener("abort", () => {
+              clearTimeout(timer);
+              reject(new DOMException("aborted", "AbortError"));
+            }, { once: true });
+          });
+        }
+      } catch (error) {
+        if (error.name === "AbortError" || token !== playToken) return;
+        viewerNote.hidden = false;
+        viewerNote.textContent = error.message;
+      }
     }
 
     function setNote(text) {
@@ -403,11 +514,10 @@
         if (open) {
           for (const file of groups.get(day).slice().sort(byRecent)) {
             const row = document.createElement("div");
-            row.className = "file";
+            row.className = file === viewingFile ? "file playing" : "file";
             const onDisk = savedNames.has(file);
             const live = file === current && !onDisk;
-            const link = clipLink(file);
-            link.textContent = file.slice(file.indexOf("/") + 1);
+            const link = clipButton(file);
             const name = document.createElement("div");
             name.className = "fold";
             if (live) {
@@ -688,6 +798,8 @@
       status.textContent = "Stopping after the current clip...";
       await fetch("/api/stop", { method: "POST" });
     });
+
+    viewerClose.addEventListener("click", () => closeViewer());
 
     settings.addEventListener("click", () => {
       if (showingFiles) showForm();

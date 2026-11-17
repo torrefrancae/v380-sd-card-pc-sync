@@ -6,7 +6,7 @@ import { appRoot } from "./app-root.js";
 import { ensureFfmpeg, ffmpegStatus } from "./ffmpeg-setup.js";
 import { recentDays, runSync, type SyncEvent } from "./job.js";
 import { discover, login, type CameraConfig } from "./session.js";
-import { clipInfo, dayFolder, listClips, pipeFile, previewFile, previewStatus, resolveClip } from "./media.js";
+import { cancelPreview, clipInfo, dayFolder, listClips, pipeFile, previewFile, previewStatus, resolveClip } from "./media.js";
 import { clearDuty, msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
 import { parseKeep, pruneKept, readKeep, writeKeep } from "./keep.js";
 import { forgetCamera, rememberCamera, savedCamera, savedCameras, savedIds } from "./saved-cameras.js";
@@ -236,6 +236,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/clip") {
       send(res, 200, await clipInfo(url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? ""));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/preview/cancel") {
+      cancelPreview();
+      send(res, 200, { ok: true });
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/preview") {
