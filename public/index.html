@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>V380 SD sync</title>
   <style>
-    :root { color-scheme: light; }
+    :root { color-scheme: light; --ink: #1a1d21; --muted: #5c6570; --line: #e2e6eb; --accent: #b8431f; --card: #fff; }
     * { box-sizing: border-box; }
-    body { margin: 0; font: 15px/1.45 "Segoe UI", sans-serif; background: #f4f1ea; color: #1c1915; }
-    header { height: 3px; background: #e4dfd4; }
-    header.busy { background: linear-gradient(90deg, #c4552a 0%, #e7b089 50%, #c4552a 100%); background-size: 200% 100%; animation: slide 1s linear infinite; }
+    body { margin: 0; font: 15px/1.5 "Segoe UI", system-ui, sans-serif; background: #eef1f4; color: var(--ink); }
+    header { height: 3px; background: #d7dde3; }
+    header.busy { background: linear-gradient(90deg, var(--accent) 0%, #e7b089 50%, var(--accent) 100%); background-size: 200% 100%; animation: slide 1s linear infinite; }
     @keyframes slide { from { background-position: 0 0; } to { background-position: 200% 0; } }
-    main { max-width: 1480px; margin: 0 auto; padding: 28px 20px 48px; }
-    h1 { font-size: 28px; font-weight: 650; margin: 0 0 8px; }
+    main { max-width: 1480px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { font-size: 30px; font-weight: 680; letter-spacing: -0.03em; margin: 0 0 6px; }
     h2 { font-size: 15px; margin: 0 0 8px; }
-    p.lead { margin: 0 0 22px; max-width: 62ch; color: #5c564c; }
-    .workspace { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 18px; align-items: start; }
-    .workspace.watching { grid-template-columns: 240px minmax(0, 1fr) minmax(300px, 420px); }
-    aside, .panel { background: #fffdf8; border: 1px solid #e4d9c8; border-radius: 16px; padding: 16px 16px 18px; box-shadow: 0 10px 30px rgba(60, 42, 20, 0.05); }
+    p.lead { margin: 0 0 22px; max-width: 68ch; color: var(--muted); }
+    .workspace { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+    .workspace.watching { grid-template-columns: 260px minmax(0, 1fr) minmax(300px, 420px); }
+    aside, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: 0 12px 32px rgba(26, 29, 33, 0.05); }
+    aside { position: sticky; top: 16px; }
     form { margin: 0; }
     .panel-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
     .panel-bar h2 { margin: 0; }
@@ -45,21 +46,30 @@
     .bar > span { display: block; height: 100%; background: #c4552a; }
     .spin { width: 14px; height: 14px; border: 2px solid #e3dccf; border-top-color: #c4552a; border-radius: 50%; animation: spin 0.8s linear infinite; flex: none; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    aside h2 { margin-top: 16px; }
+    aside h2 { margin-top: 18px; }
     aside h2:first-child { margin-top: 0; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    label { display: block; font-size: 13px; margin: 12px 0 4px; color: #3f3a33; }
-    input, select { width: 100%; border: 1px solid #d9d0c3; border-radius: 8px; padding: 9px 10px; font: inherit; background: #fff; }
+    .group { border: 1px solid var(--line); border-radius: 14px; background: #f8fafb; margin: 0 0 14px; padding: 8px 16px 16px; }
+    .group legend { font-weight: 680; padding: 0 6px; }
+    .field { margin-top: 14px; }
+    label { display: block; font-size: 13px; font-weight: 650; margin: 0 0 4px; color: #2a3036; }
+    .field-hint, .hint { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+    .guide { background: #fff7f2; border: 1px solid #f0d2c2; border-radius: 12px; padding: 12px 14px; margin-top: 8px; }
+    .guide p { margin: 0; }
+    .guide ol { margin: 8px 0 10px; padding-left: 1.2em; }
+    .guide li { margin: 4px 0; }
+    input, select { width: 100%; border: 1px solid #cfd6de; border-radius: 10px; padding: 11px 12px; font: inherit; background: #fff; }
+    input:focus, select:focus { outline: 3px solid #d7e6ff; border-color: #1f6feb; }
     .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-    button { border: 0; border-radius: 999px; padding: 9px 14px; font: inherit; cursor: pointer; background: #1c1915; color: #fffdf8; }
-    button.secondary { background: #efeae1; color: #1c1915; }
-    #settings { background: #fff; color: #1c1915; border: 1px solid #e4d9c8; }
+    button { border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-weight: 650; cursor: pointer; background: #1a1d21; color: #fff; }
+    button.secondary { background: #e8edf2; color: #1a1d21; }
+    #start { background: var(--accent); }
+    #settings { background: #fff; color: #1a1d21; border: 1px solid var(--line); }
     button:disabled { opacity: 0.55; cursor: default; }
     .cameras { display: flex; flex-direction: column; gap: 8px; }
-    .cameras button { display: block; width: 100%; text-align: left; background: #fff; color: #1c1915; border: 1px solid #e3dccf; }
-    .cameras button[aria-pressed="true"] { border-color: #c4552a; }
-    .empty { margin: 0; color: #6b645b; font-size: 13px; }
-    .status { min-height: 1.2em; margin: 10px 0 0; color: #6b4a32; }
+    .cameras button { display: block; width: 100%; text-align: left; background: #fff; color: #1a1d21; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 500; line-height: 1.35; }
+    .cameras button[aria-pressed="true"] { border-color: var(--accent); background: #fff7f2; box-shadow: inset 3px 0 0 var(--accent); }
+    .empty { margin: 0; color: var(--muted); font-size: 13px; }
+    .status { min-height: 1.2em; margin: 12px 0 0; color: #7a3b22; font-weight: 600; }
     #viewer video { width: 100%; max-height: 70vh; background: #111; border-radius: 10px; }
     #viewer-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .warn { background: #fff4e8; border: 1px solid #e7c7a4; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
@@ -74,7 +84,7 @@
   <header id="bar"></header>
   <main>
     <h1>V380 SD sync</h1>
-    <p class="lead">Syncs recordings from a V380 camera on this network. Save a camera once and the next run connects with that device login. Closing this page leaves the download running.</p>
+    <p class="lead">Copy SD card recordings from a V380 camera on this network onto this PC. Save the camera once. Closing this page leaves the download running.</p>
     <div id="ffmpeg" class="warn" hidden>Downloading ffmpeg. This happens once.</div>
     <div class="workspace">
       <aside>
@@ -89,54 +99,84 @@
       </aside>
       <section class="panel" id="panel">
         <div class="panel-bar">
-          <h2 id="panel-title">Camera</h2>
+          <h2 id="panel-title">Setup</h2>
           <div class="actions">
             <button type="button" id="stop" class="secondary" disabled hidden>Stop</button>
             <button type="button" id="settings" class="secondary" hidden>Settings</button>
           </div>
         </div>
       <form id="form">
-        <label for="name">Name</label>
-        <input id="name" name="name" autocomplete="off" placeholder="Kitchen">
-        <div class="row">
-          <div>
+        <fieldset class="group">
+          <legend>Camera</legend>
+          <div class="field">
+            <label for="name">Name</label>
+            <p class="field-hint">The name shown under Saved cameras. For example, Kitchen.</p>
+            <input id="name" name="name" autocomplete="off" placeholder="Kitchen">
+          </div>
+          <div class="field">
             <label for="host">Camera IP</label>
-            <input id="host" name="host" autocomplete="off" required>
+            <p class="field-hint">Filled in when you choose a camera from Find on network.</p>
+            <input id="host" name="host" autocomplete="off" required placeholder="Camera address">
           </div>
-          <div>
+          <div class="field">
             <label for="deviceId">Device ID</label>
-            <input id="deviceId" name="deviceId" inputmode="numeric" autocomplete="off" required>
+            <p class="field-hint">The number the camera sends when it is found on this network.</p>
+            <input id="deviceId" name="deviceId" inputmode="numeric" autocomplete="off" required placeholder="Device ID">
           </div>
-        </div>
-        <div class="row">
-          <div>
+        </fieldset>
+        <fieldset class="group">
+          <legend>Username and password</legend>
+          <div class="guide">
+            <p>Set these in the V380 app on Android or iOS. Then type the same ones here.</p>
+            <ol>
+              <li>Open the camera in the V380 app.</li>
+              <li>Tap the three dots at the top right of the camera.</li>
+              <li>Tap <strong>Settings</strong>.</li>
+              <li>Tap <strong>Password</strong>.</li>
+              <li>Tap <strong>Change device password</strong>.</li>
+              <li>Set a username and a password. Enter the password twice so you do not forget it.</li>
+            </ol>
+            <p>This is the camera login. It is not the V380 account email or account password.</p>
+          </div>
+          <div class="field">
             <label for="username">Username</label>
-            <input id="username" name="username" autocomplete="username" required>
+            <p class="field-hint">The username you just set in the phone app.</p>
+            <input id="username" name="username" autocomplete="username" required placeholder="Camera username">
           </div>
-          <div>
-            <label for="password">Device password</label>
-            <input id="password" name="password" type="password" autocomplete="current-password">
+          <div class="field">
+            <label for="password">Password</label>
+            <p class="field-hint">The password you just set in the phone app. Leave it blank later to keep the saved one.</p>
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Camera password">
           </div>
-        </div>
-        <div class="row">
-          <div>
+        </fieldset>
+        <fieldset class="group">
+          <legend>What to download</legend>
+          <div class="field">
             <label for="days">Days to download</label>
+            <p class="field-hint">How many recent days to copy. 7 includes today and the six days before it.</p>
             <input id="days" name="days" type="number" min="1" max="60" value="7">
           </div>
-          <div>
+          <div class="field">
             <label for="date">Or one date</label>
+            <p class="field-hint">Fill this only when you want a single day instead of the range above.</p>
             <input id="date" name="date" type="date">
           </div>
-        </div>
-        <label for="outDir">Save folder</label>
-        <input id="outDir" name="outDir" value="recordings">
-        <div class="row">
-          <div>
+        </fieldset>
+        <fieldset class="group">
+          <legend>On this PC</legend>
+          <div class="field">
+            <label for="outDir">Save folder</label>
+            <p class="field-hint">Where the MP4 files are stored on this PC.</p>
+            <input id="outDir" name="outDir" value="recordings">
+          </div>
+          <div class="field">
             <label for="keepAmount">Keep local videos</label>
+            <p class="field-hint">30 days is the default. Older copies are deleted from this PC and stay in the list. Clear the number to keep every saved video. The camera SD card is not changed.</p>
             <input id="keepAmount" name="keepAmount" type="number" min="1" step="1" value="30" placeholder="30">
           </div>
-          <div>
+          <div class="field">
             <label for="keepUnit">Then delete older</label>
+            <p class="field-hint">Minutes, hours, days, weeks, or months. Raise this later to download a deleted clip again.</p>
             <select id="keepUnit" name="keepUnit">
               <option value="minutes">Minutes</option>
               <option value="hours">Hours</option>
@@ -145,12 +185,11 @@
               <option value="months">Months</option>
             </select>
           </div>
-        </div>
-        <p class="empty">30 days is the default. Older videos are deleted from this PC. Clear the number and apply to keep every saved video. The camera SD card is not changed.</p>
+        </fieldset>
         <div class="actions">
+          <button type="submit" id="start">Start download</button>
           <button type="button" id="save" class="secondary">Save camera</button>
           <button type="button" id="check" class="secondary">Check login</button>
-          <button type="submit" id="start">Start download</button>
           <button type="button" id="applyKeep" class="secondary">Apply keep</button>
           <button type="button" id="remove" class="secondary">Remove</button>
         </div>
@@ -393,7 +432,7 @@
       showingFiles = false;
       form.hidden = false;
       explorer.hidden = true;
-      panelTitle.textContent = "Camera";
+      panelTitle.textContent = "Setup";
       settings.hidden = false;
       settings.textContent = "Files";
     }
