@@ -10,6 +10,7 @@ import { cancelPreview, clipInfo, dayFolder, pipeFile, previewFile, previewStatu
 import { clearDuty, msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
 import { ensureDefaultKeep, parseKeep, pruneKept, readKeep, writeKeep } from "./keep.js";
 import { listedClips, rememberRemoved, syncRemoved } from "./removed-clips.js";
+import { stopLive, streamLive } from "./live.js";
 import { forgetCamera, rememberCamera, savedCamera, savedCameras, savedIds } from "./saved-cameras.js";
 import { deviceFromV380, readV380Devices } from "./v380-store.js";
 
@@ -339,6 +340,28 @@ const server = http.createServer(async (req, res) => {
       clearDuty();
       active?.abort();
       send(res, 200, { ok: true });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/live/stop") {
+      stopLive();
+      send(res, 200, { ok: true });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/live") {
+      const camera = savedCamera(Number(url.searchParams.get("id")));
+      if (!camera) throw new Error("Save this camera first, including its username and password");
+      await ensureFfmpeg();
+      const closed = new AbortController();
+      res.on("close", () => {
+        if (!res.writableEnded) closed.abort();
+      });
+      await streamLive({
+        host: camera.host,
+        port: camera.port || 8800,
+        deviceId: camera.id,
+        username: camera.username,
+        password: camera.password,
+      }, res, closed.signal);
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/events") {

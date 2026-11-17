@@ -120,7 +120,14 @@ export class CameraSocket {
 
   write(data: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.socket.write(data, (err) => (err ? reject(err) : resolve()));
+      let settled = false;
+      const finish = (err?: Error | null) => {
+        if (settled) return;
+        settled = true;
+        if (err) reject(err);
+        else resolve();
+      };
+      if (this.socket.write(data, finish)) finish();
     });
   }
 
@@ -135,16 +142,21 @@ export function openCamera(host: string, port: number, timeoutMs: number): Promi
   return new Promise((resolve, reject) => {
     const socket = net.connect({ host, port });
     socket.setNoDelay(true);
+    let settled = false;
+    const timer = setTimeout(() => fail(new Error(`timed out connecting to ${host}:${port}`)), timeoutMs);
     const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       socket.destroy();
       reject(err);
     };
     socket.once("error", fail);
-    socket.setTimeout(timeoutMs);
-    socket.once("timeout", () => fail(new Error(`timed out connecting to ${host}:${port}`)));
     socket.once("connect", () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       socket.removeAllListeners("error");
-      socket.removeAllListeners("timeout");
       socket.setTimeout(timeoutMs);
       resolve(new CameraSocket(socket));
     });
