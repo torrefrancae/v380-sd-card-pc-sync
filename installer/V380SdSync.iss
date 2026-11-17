@@ -28,4 +28,4 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: ""
 Name: "{autodesktop}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch.vbs"""; WorkingDir: "{app}"
 
 [Run]
-Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch.vbs"""; Description: "Open V380 SD Sync"; Flags: postinstall nowait skipifsilent
+Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch.vbs"""; Flags: nowait runasoriginaluser

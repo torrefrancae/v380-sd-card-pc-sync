@@ -56,7 +56,22 @@ jobs:
           name: V380SdSync-Setup
           path: dist/installer/*.exe
 
-      - name: Publish the installer
+      - name: Publish the latest installer
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $exe = "dist/installer/V380SdSync-Setup.exe"
+          gh release view latest
+          if ($LASTEXITCODE -ne 0) {
+            gh release create latest $exe --target main --title "Latest" --notes "Current Windows installer." --latest
+          } else {
+            gh release upload latest $exe --clobber
+            gh release edit latest --latest --target main
+          }
+
+      - name: Publish a versioned installer
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:

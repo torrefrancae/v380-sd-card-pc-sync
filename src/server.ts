@@ -336,7 +336,9 @@ server.listen(port, "127.0.0.1", () => {
   }, msUntilThreeAm(new Date()));
   restart.unref();
   if (process.env.V380_NO_OPEN) return;
-  const opener = process.platform === "win32" ? spawn("cmd", ["/c", "start", "", address]) : spawn(process.platform === "darwin" ? "open" : "xdg-open", [address]);
+  const opener = process.platform === "win32"
+    ? spawn("cmd.exe", ["/d", "/s", "/c", `start "" "${address}"`], { detached: true, stdio: "ignore", windowsHide: true })
+    : spawn(process.platform === "darwin" ? "open" : "xdg-open", [address], { detached: true, stdio: "ignore" });
   opener.on("error", () => undefined);
   opener.unref();
 });
