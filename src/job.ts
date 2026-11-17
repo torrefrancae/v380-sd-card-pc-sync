@@ -61,9 +61,17 @@ export function chooseClip(fresh: Segment[], past: Segment[], now: number, saved
   const ready = (segment: Segment) => segment.end < now - 20 && !saved(segment.start);
   const newest = fresh.filter(ready).sort((a, b) => b.start - a.start)[0];
   if (newest) return { segment: newest, kind: "new" };
-  const oldest = past.filter(ready).sort((a, b) => a.start - b.start)[0];
-  if (oldest) return { segment: oldest, kind: "old" };
+  const recent = past.filter(ready).sort((a, b) => b.start - a.start)[0];
+  if (recent) return { segment: recent, kind: "old" };
   return null;
+}
+
+/* Older days are oldest-first. The cursor starts at the most recent of them and stays there until that day has no finished clip left. */
+export function olderDayIndex(count: number, cursor: number, exhausted: boolean): number {
+  if (count <= 0) return -1;
+  const current = cursor < 0 || cursor >= count ? count - 1 : cursor;
+  if (!exhausted) return current;
+  return current - 1;
 }
 
 function wait(ms: number, signal: AbortSignal): Promise<void> {
@@ -89,9 +97,9 @@ export async function runSync(options: {
 }, emit: (event: SyncEvent) => void): Promise<void> {
   let opened = await openSession(options.config);
   emit({ type: "log", message: `camera ${opened.config.host} id ${opened.config.deviceId}` });
-  emit({ type: "log", message: "Watching for new clips first. Older missing clips download when nothing new is ready." });
+  emit({ type: "log", message: "Watching for the most recent finished clip. The next most recent day starts after that day is caught up." });
   const fixed = options.days.length === 1;
-  let backlogIndex = 0;
+  let olderCursor = -1;
   let saved = 0;
   let skipped = 0;
   let rate = 28_000;
@@ -102,11 +110,12 @@ export async function runSync(options: {
     const window = fixed ? options.days : recentDays(options.days.length);
     const newest = window[window.length - 1];
     const older = window.filter((day) => day !== newest);
-    const backlogDay = older.length ? older[backlogIndex % older.length] : "";
-    backlogIndex += 1;
+    olderCursor = olderDayIndex(older.length, olderCursor, false);
+    const backlogDay = olderCursor >= 0 ? older[olderCursor] : "";
     emit({ type: "log", message: backlogDay ? `checking ${newest} and ${backlogDay}` : `checking ${newest}` });
     let fresh: Segment[] = [];
     let past: Segment[] = [];
+    let olderFailed = false;
     try {
       const results = await Promise.allSettled([
         searchDay(opened.config, opened.ticket, newest, options.signal),
@@ -118,7 +127,10 @@ export async function runSync(options: {
         throw results[0].reason;
       }
       if (results[0].status === "rejected") emit({ type: "log", message: `new-clip check failed (${messageOf(results[0].reason)})` });
-      if (results[1].status === "rejected") emit({ type: "log", message: `older-clip check failed (${messageOf(results[1].reason)})` });
+      if (results[1].status === "rejected") {
+        olderFailed = true;
+        emit({ type: "log", message: `older-clip check failed (${messageOf(results[1].reason)})` });
+      }
     } catch (error) {
       if (options.signal.aborted) break;
       emit({ type: "log", message: `reconnecting (${messageOf(error)})` });
@@ -138,8 +150,14 @@ export async function runSync(options: {
       skipped += 1;
     }
     const available = (segment: Segment) => (hold.get(segment.id) ?? 0) <= Date.now();
-    const choice = chooseClip(fresh.filter(available), past.filter(available), cameraNow(), onDisk);
+    const nowSeconds = cameraNow();
+    const choice = chooseClip(fresh.filter(available), past.filter(available), nowSeconds, onDisk);
     if (!choice) {
+      const deferred = past.some((segment) => segment.end < nowSeconds - 20 && !onDisk(segment.start) && !available(segment));
+      const exhausted = Boolean(backlogDay) && !deferred && !olderFailed;
+      const next = olderDayIndex(older.length, olderCursor, exhausted);
+      olderCursor = next;
+      if (exhausted && next >= 0) continue;
       if (!quiet) {
         emit({ type: "focus", file: "" });
         emit({ type: "log", message: "No finished clip is waiting. Checking again shortly." });
