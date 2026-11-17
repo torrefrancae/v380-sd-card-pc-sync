@@ -8,6 +8,7 @@ import { recentDays, runSync, type SyncEvent } from "./job.js";
 import { discover, login, type CameraConfig } from "./session.js";
 import { clipInfo, dayFolder, listClips, pipeFile, previewFile, previewStatus, resolveClip } from "./media.js";
 import { clearDuty, msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
+import { parseKeep, pruneKept, readKeep, writeKeep } from "./keep.js";
 import { forgetCamera, rememberCamera, savedCamera, savedCameras, savedIds } from "./saved-cameras.js";
 import { deviceFromV380, readV380Devices } from "./v380-store.js";
 
@@ -25,6 +26,8 @@ interface StartBody {
   outDir?: string;
   limit?: number;
   fromApp?: boolean;
+  keepAmount?: number | string;
+  keepUnit?: string;
 }
 
 const listeners = new Set<http.ServerResponse>();
@@ -141,6 +144,7 @@ async function startSync(body: StartBody) {
     date,
     outDir,
   });
+  rememberKeep(body, outDir);
   const controller = new AbortController();
   active = controller;
   emit({ type: "log", message: "Starting download. Closing the page leaves this running." });
@@ -154,6 +158,23 @@ async function startSync(body: StartBody) {
       emit({ type: "idle" });
       if (!restarting && readDuty()) setTimeout(() => { void resumeDuty(); }, 5000);
     });
+}
+
+function rememberKeep(body: StartBody, outDir: string) {
+  if (body.keepAmount === undefined && body.keepUnit === undefined) return;
+  writeKeep(parseKeep(body.keepAmount, body.keepUnit, outDir));
+  sweepOldVideos();
+}
+
+function sweepOldVideos(): string[] {
+  const keep = readKeep();
+  if (!keep) return [];
+  const deleted = pruneKept(keep, new Date(), activeFile);
+  if (deleted.length) {
+    const noun = deleted.length === 1 ? "video" : "videos";
+    emit({ type: "log", message: `Removed ${deleted.length} local ${noun} older than ${keep.amount} ${keep.unit}.` });
+  }
+  return deleted;
 }
 
 function resumeDuty() {
@@ -193,6 +214,20 @@ const server = http.createServer(async (req, res) => {
       opener.on("error", () => undefined);
       opener.unref();
       send(res, 200, { ok: true });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/keep") {
+      const keep = readKeep();
+      send(res, 200, { amount: keep?.amount ?? null, unit: keep?.unit ?? "days", outDir: keep?.outDir ?? "" });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/keep") {
+      const body = await readJson(req);
+      const outDir = body.outDir?.trim() || readKeep()?.outDir || path.join(root, "recordings");
+      writeKeep(parseKeep(body.keepAmount, body.keepUnit, outDir));
+      const deleted = sweepOldVideos();
+      const keep = readKeep();
+      send(res, 200, { ok: true, deleted, amount: keep?.amount ?? null, unit: keep?.unit ?? null });
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/clips") {
@@ -329,6 +364,8 @@ server.listen(port, "127.0.0.1", () => {
     console.error(error instanceof Error ? error.message : error);
   });
   resumeDuty();
+  const sweep = setInterval(() => sweepOldVideos(), 15_000);
+  sweep.unref();
   const restart = setTimeout(() => {
     restarting = true;
     active?.abort();

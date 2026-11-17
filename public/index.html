@@ -45,7 +45,7 @@
     aside h2:first-child { margin-top: 0; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     label { display: block; font-size: 13px; margin: 12px 0 4px; color: #3f3a33; }
-    input { width: 100%; border: 1px solid #d9d0c3; border-radius: 8px; padding: 9px 10px; font: inherit; background: #fff; }
+    input, select { width: 100%; border: 1px solid #d9d0c3; border-radius: 8px; padding: 9px 10px; font: inherit; background: #fff; }
     .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
     button { border: 0; border-radius: 999px; padding: 9px 14px; font: inherit; cursor: pointer; background: #1c1915; color: #fffdf8; }
     button.secondary { background: #efeae1; color: #1c1915; }
@@ -125,10 +125,28 @@
         </div>
         <label for="outDir">Save folder</label>
         <input id="outDir" name="outDir" value="recordings">
+        <div class="row">
+          <div>
+            <label for="keepAmount">Keep local videos</label>
+            <input id="keepAmount" name="keepAmount" type="number" min="1" step="1" placeholder="Keep all">
+          </div>
+          <div>
+            <label for="keepUnit">Then delete older</label>
+            <select id="keepUnit" name="keepUnit">
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+              <option value="days" selected>Days</option>
+              <option value="weeks">Weeks</option>
+              <option value="months">Months</option>
+            </select>
+          </div>
+        </div>
+        <p class="empty">Leave the number empty to keep every saved video. A number deletes older videos from this PC only. The camera SD card is not changed. Minutes are there so a short limit can be checked.</p>
         <div class="actions">
           <button type="button" id="save" class="secondary">Save camera</button>
           <button type="button" id="check" class="secondary">Check login</button>
           <button type="submit" id="start">Start download</button>
+          <button type="button" id="applyKeep" class="secondary">Apply keep</button>
           <button type="button" id="remove" class="secondary">Remove</button>
         </div>
         <p id="status" class="status" role="status"></p>
@@ -154,6 +172,7 @@
     const start = document.querySelector("#start");
     const stop = document.querySelector("#stop");
     const remove = document.querySelector("#remove");
+    const applyKeep = document.querySelector("#applyKeep");
     const form = document.querySelector("#form");
     let busy = false;
     let foundCameras = [];
@@ -166,6 +185,7 @@
     const openDays = new Set();
     const closedDays = new Set();
     const remarks = new Map();
+    let keepLoaded = false;
 
     function setBusy(on, text) {
       busy = on;
@@ -212,6 +232,10 @@
       else if (message.startsWith("No finished")) setNote("Waiting for the next clip.");
       else if (message.startsWith("reconnecting")) setNote("Reconnecting.");
       else if (message.startsWith("Watching")) setNote("Watching for new clips.");
+      else if (message.startsWith("Removed ")) {
+        setNote(message);
+        loadClips();
+      }
       else setNote(message);
       if (file && (message.startsWith("new ") || message.startsWith("older "))) {
         activeFile = file;
@@ -426,7 +450,7 @@
 
     function payload() {
       const data = Object.fromEntries(new FormData(form));
-      return {
+      const body = {
         name: data.name,
         host: data.host,
         deviceId: Number(data.deviceId),
@@ -436,6 +460,11 @@
         date: data.date,
         outDir: data.outDir
       };
+      if (keepLoaded) {
+        body.keepAmount = data.keepAmount;
+        body.keepUnit = data.keepUnit;
+      }
+      return body;
     }
 
     async function post(url) {
@@ -568,6 +597,32 @@
       status.textContent = "Removed from Saved cameras. Find on network can list it again.";
     });
 
+    applyKeep.addEventListener("click", async () => {
+      applyKeep.disabled = true;
+      status.textContent = "Saving how long to keep local videos...";
+      try {
+        const response = await fetch("/api/keep", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            keepAmount: form.keepAmount.value,
+            keepUnit: form.keepUnit.value,
+            outDir: form.outDir.value
+          })
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Could not save the keep limit");
+        const removed = body.deleted?.length || 0;
+        if (!body.amount) status.textContent = "Keeping every saved video on this PC.";
+        else status.textContent = "Keeping the last " + body.amount + " " + body.unit + ". Removed " + removed + " older local video" + (removed === 1 ? "" : "s") + ".";
+        if (showingFiles) loadClips();
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        applyKeep.disabled = false;
+      }
+    });
+
     check.addEventListener("click", async () => {
       bar.classList.add("busy");
       check.disabled = true;
@@ -665,6 +720,12 @@
       setTimeout(watchFfmpeg, 2000);
     }
     watchFfmpeg();
+    fetch("/api/keep").then((response) => response.json()).then((body) => {
+      if (body.unit) form.keepUnit.value = body.unit;
+      if (body.amount) form.keepAmount.value = body.amount;
+    }).catch(() => undefined).finally(() => {
+      keepLoaded = true;
+    });
     loadSaved();
     renderFound();
     fetch("/api/status").then((response) => response.json()).then((body) => {
