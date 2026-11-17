@@ -16,7 +16,17 @@
     h2 { font-size: 15px; margin: 0 0 8px; }
     p.lead { margin: 0 0 22px; max-width: 68ch; color: var(--muted); }
     .workspace { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 18px; align-items: start; }
-    .workspace.watching { grid-template-columns: 360px minmax(0, 1fr) minmax(300px, 420px); }
+    .workspace.watching { grid-template-columns: 280px minmax(160px, 240px) minmax(0, 1fr); }
+    .workspace.watching .cols,
+    .workspace.watching .day-head,
+    .workspace.watching .file { grid-template-columns: minmax(0, 1fr); }
+    .workspace.watching .when,
+    .workspace.watching .progress,
+    .workspace.watching .remark,
+    .workspace.watching .reveal,
+    .workspace.watching .cols > :not(:first-child),
+    .workspace.watching .day-head > :not(:first-child),
+    .workspace.watching .file > :not(:first-child) { display: none; }
     aside, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: 0 12px 32px rgba(26, 29, 33, 0.05); }
     aside { position: sticky; top: 16px; }
     form { margin: 0; }
@@ -81,7 +91,9 @@
     .status { min-height: 1.2em; margin: 12px 0 0; color: #7a3b22; font-weight: 600; }
     #viewer video, #viewer img { width: 100%; max-height: 70vh; background: #111; border-radius: 10px; object-fit: contain; }
     #viewer-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .warn { background: #fff4e8; border: 1px solid #e7c7a4; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+    .warn, .alert { background: #fff4e8; border: 1px solid #e7c7a4; border-radius: 12px; padding: 10px 12px; }
+    .warn { margin-bottom: 14px; }
+    .alert { margin-top: 14px; color: #7a3b22; font-size: 13px; font-weight: 650; }
     @media (max-width: 1100px) {
       .workspace, .workspace.watching, .row { grid-template-columns: 1fr; }
       .cols, .day-head, .file { grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) 56px minmax(0, 0.9fr) 72px; }
@@ -178,14 +190,15 @@
             <p class="field-hint">Where the MP4 files are stored on this PC.</p>
             <input id="outDir" name="outDir" value="recordings">
           </div>
+          <p class="alert" role="status">Old videos are deleted on this PC only. The camera SD card is not changed.</p>
           <div class="field">
             <label for="keepAmount">Keep local videos</label>
-            <p class="field-hint">30 days is the default. An older video is deleted from this PC only when a new one is saved: one in, one out. Clear the number to keep every saved video. The camera SD card is not changed.</p>
+            <p class="field-hint">30 days is the default. An older video on this PC is deleted only when a new one is saved: one in, one out. Clear the number to keep every saved video.</p>
             <input id="keepAmount" name="keepAmount" type="number" min="1" step="1" value="30" placeholder="30">
           </div>
           <div class="field">
             <label for="keepUnit">Then delete older</label>
-            <p class="field-hint">Minutes, hours, days, weeks, or months. Raise this later to download a deleted clip again.</p>
+            <p class="field-hint">Minutes, hours, days, weeks, or months. Old files past this limit are deleted on this PC, not on the camera. Raise this later to download a deleted clip again.</p>
             <select id="keepUnit" name="keepUnit">
               <option value="minutes">Minutes</option>
               <option value="hours">Hours</option>
