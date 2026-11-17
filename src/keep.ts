@@ -96,12 +96,13 @@ function clipKey(day: string, name: string): string | null {
   return `${day}/${base}`;
 }
 
-export function pruneKept(keep: Keep, now: Date, activeFile = ""): string[] {
+/* Delete the oldest saved videos past the keep limit. limit is how many clips may go. */
+export function pruneKept(keep: Keep, now: Date, activeFile = "", limit = 1): string[] {
   const dir = resolveOutDir(keep.outDir);
-  if (!fs.existsSync(dir)) return [];
+  if (!fs.existsSync(dir) || limit < 1) return [];
   const cutoff = keepCutoff(now, keep).getTime();
   const active = activeFile.replaceAll("\\", "/");
-  const deleted: string[] = [];
+  const oldest = new Map<string, { when: number; folder: string }>();
   for (const day of fs.readdirSync(dir)) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
     const folder = path.join(dir, day);
@@ -114,23 +115,38 @@ export function pruneKept(keep: Keep, now: Date, activeFile = ""): string[] {
     if (!stat.isDirectory()) continue;
     for (const name of fs.readdirSync(folder)) {
       const key = clipKey(day, name);
-      if (!key) continue;
+      if (!key || key === active || oldest.has(key)) continue;
       const when = clipClock(key);
       if (!when || when.getTime() > cutoff) continue;
-      if (key === active) continue;
-      const full = path.join(folder, name);
-      try {
-        fs.rmSync(full, { force: true });
-        deleted.push(key);
-      } catch {
-        /* The file can be open while a copy is finishing. */
-      }
+      oldest.set(key, { when: when.getTime(), folder });
     }
+  }
+  const chosen = [...oldest.entries()].sort((left, right) => left[1].when - right[1].when).slice(0, limit);
+  const deleted: string[] = [];
+  for (const [key, item] of chosen) {
+    if (!deleteClip(item.folder, key)) continue;
+    deleted.push(key);
     try {
-      if (fs.readdirSync(folder).length === 0) fs.rmdirSync(folder);
+      if (fs.readdirSync(item.folder).length === 0) fs.rmdirSync(item.folder);
     } catch {
       /* Leave a folder that is still in use. */
     }
   }
-  return [...new Set(deleted)];
+  return deleted;
+}
+
+function deleteClip(folder: string, key: string): boolean {
+  const name = key.slice(key.indexOf("/") + 1);
+  const stem = name.replace(/\.mp4$/, "");
+  let removed = false;
+  for (const file of [`${stem}.mp4`, `${stem}.h265`, `${stem}.partial.mp4`]) {
+    try {
+      if (!fs.existsSync(path.join(folder, file))) continue;
+      fs.rmSync(path.join(folder, file), { force: true });
+      removed = true;
+    } catch {
+      /* The file can be open while a copy is finishing. */
+    }
+  }
+  return removed;
 }

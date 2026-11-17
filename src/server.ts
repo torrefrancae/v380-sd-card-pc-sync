@@ -73,6 +73,10 @@ function emit(event: SyncEvent | { type: "error"; message: string } | { type: "i
       listeners.delete(listener);
     }
   }
+  if (event.type === "log" && event.message.startsWith("saved ")) {
+    const found = event.message.match(/(\d{4}-\d{2}-\d{2}[/\\]\d{6}\.mp4)/);
+    if (found) releaseOne(found[1].replaceAll("\\", "/"));
+  }
 }
 
 async function readJson(req: http.IncomingMessage): Promise<StartBody> {
@@ -170,17 +174,18 @@ function rememberKeep(body: StartBody, outDir: string) {
 
 function sweepOldVideos(): string[] {
   const keep = readKeep();
-  if (!keep) {
-    syncRemoved(path.join(root, "recordings"));
-    return [];
-  }
-  syncRemoved(keep.outDir);
-  const deleted = pruneKept(keep, new Date(), activeFile);
-  if (deleted.length) {
-    rememberRemoved(keep.outDir, deleted);
-    const noun = deleted.length === 1 ? "video" : "videos";
-    emit({ type: "log", message: `Removed ${deleted.length} local ${noun} older than ${keep.amount} ${keep.unit}.` });
-  }
+  syncRemoved(keep ? keep.outDir : path.join(root, "recordings"));
+  return [];
+}
+
+/* One saved video may remove one older video. Nothing is deleted when nothing new was saved. */
+function releaseOne(savedFile: string): string[] {
+  const keep = readKeep();
+  if (!keep) return [];
+  const deleted = pruneKept(keep, new Date(), savedFile, 1);
+  if (!deleted.length) return [];
+  rememberRemoved(keep.outDir, deleted);
+  emit({ type: "log", message: `Removed 1 local video older than ${keep.amount} ${keep.unit}.` });
   return deleted;
 }
 

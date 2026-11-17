@@ -180,7 +180,7 @@
           </div>
           <div class="field">
             <label for="keepAmount">Keep local videos</label>
-            <p class="field-hint">30 days is the default. Older copies are deleted from this PC and stay in the list. Clear the number to keep every saved video. The camera SD card is not changed.</p>
+            <p class="field-hint">30 days is the default. An older video is deleted from this PC only when a new one is saved: one in, one out. Clear the number to keep every saved video. The camera SD card is not changed.</p>
             <input id="keepAmount" name="keepAmount" type="number" min="1" step="1" value="30" placeholder="30">
           </div>
           <div class="field">
@@ -899,9 +899,8 @@
         });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Could not save the keep limit");
-        const removed = body.deleted?.length || 0;
         if (!body.amount) status.textContent = "Keeping every saved video on this PC.";
-        else status.textContent = "Keeping the last " + body.amount + " " + body.unit + ". Removed " + removed + " older local video" + (removed === 1 ? "" : "s") + ".";
+        else status.textContent = "Keeping the last " + body.amount + " " + body.unit + ". An older video is removed only when a new one is saved.";
         if (showingFiles) loadClips();
       } catch (error) {
         status.textContent = error.message;
