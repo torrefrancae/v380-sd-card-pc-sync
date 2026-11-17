@@ -1,0 +1,8 @@
+node_modules/
+recordings/
+*.h265
+*.partial.mp4
+.env
+.idea/
+dist/
+build/

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>V380 SD sync</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 "Segoe UI", sans-serif; background: #f4f1ea; color: #1c1915; }
+    header { height: 3px; background: #e4dfd4; }
+    header.busy { background: linear-gradient(90deg, #c4552a 0%, #e7b089 50%, #c4552a 100%); background-size: 200% 100%; animation: slide 1s linear infinite; }
+    @keyframes slide { from { background-position: 0 0; } to { background-position: 200% 0; } }
+    main { max-width: 760px; margin: 0 auto; padding: 28px 20px 48px; }
+    h1 { font-size: 28px; font-weight: 650; margin: 0 0 8px; }
+    p.lead { margin: 0 0 22px; color: #5c564c; }
+    form, .log { background: #fffdf8; border: 1px solid #e3dccf; border-radius: 12px; padding: 18px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: 13px; margin: 12px 0 4px; color: #3f3a33; }
+    input { width: 100%; border: 1px solid #d9d0c3; border-radius: 8px; padding: 9px 10px; font: inherit; background: #fff; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    button { border: 0; border-radius: 8px; padding: 9px 14px; font: inherit; cursor: pointer; background: #1c1915; color: #fffdf8; }
+    button.secondary { background: #efeae1; color: #1c1915; }
+    button:disabled { opacity: 0.55; cursor: default; }
+    .cameras { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .cameras button { text-align: left; background: #fff; color: #1c1915; border: 1px solid #e3dccf; }
+    .cameras button[aria-pressed="true"] { border-color: #c4552a; }
+    .status { min-height: 1.2em; margin: 10px 0 0; color: #6b4a32; }
+    .log { margin-top: 16px; min-height: 180px; white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+    .warn { background: #fff4e8; border: 1px solid #e7c7a4; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header id="bar"></header>
+  <main>
+    <h1>V380 SD sync</h1>
+    <p class="lead">Downloads recordings from a V380 camera on this network. Use the camera username and device password from V380 Pro, not the account email.</p>
+    <div id="ffmpeg" class="warn" hidden>ffmpeg is missing. Install it, then reopen this page. On Windows, add ffmpeg to PATH.</div>
+    <form id="form">
+      <div class="actions">
+        <button type="button" id="find" class="secondary">Find cameras</button>
+      </div>
+      <div id="cameras" class="cameras"></div>
+      <div class="row">
+        <div>
+          <label for="host">Camera IP</label>
+          <input id="host" name="host" autocomplete="off" required>
+        </div>
+        <div>
+          <label for="deviceId">Device ID</label>
+          <input id="deviceId" name="deviceId" inputmode="numeric" autocomplete="off" required>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="username">Username</label>
+          <input id="username" name="username" autocomplete="username" required>
+        </div>
+        <div>
+          <label for="password">Device password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="days">Days to download</label>
+          <input id="days" name="days" type="number" min="1" max="60" value="1">
+        </div>
+        <div>
+          <label for="date">Or one date</label>
+          <input id="date" name="date" type="date">
+        </div>
+      </div>
+      <label for="outDir">Save folder</label>
+      <input id="outDir" name="outDir" value="recordings">
+      <div class="actions">
+        <button type="button" id="check" class="secondary">Check login</button>
+        <button type="submit" id="start">Start download</button>
+        <button type="button" id="stop" class="secondary" disabled>Stop</button>
+      </div>
+      <p id="status" class="status" role="status"></p>
+    </form>
+    <div id="log" class="log" aria-live="polite"></div>
+  </main>
+  <script>
+    const bar = document.querySelector("#bar");
+    const status = document.querySelector("#status");
+    const log = document.querySelector("#log");
+    const cameras = document.querySelector("#cameras");
+    const find = document.querySelector("#find");
+    const check = document.querySelector("#check");
+    const start = document.querySelector("#start");
+    const stop = document.querySelector("#stop");
+    const form = document.querySelector("#form");
+    let busy = false;
+
+    function setBusy(on, text) {
+      busy = on;
+      bar.classList.toggle("busy", on);
+      find.disabled = on;
+      check.disabled = on;
+      start.disabled = on;
+      stop.disabled = !on;
+      status.textContent = text || "";
+    }
+
+    function line(text) {
+      log.textContent += (log.textContent ? "\n" : "") + text;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function payload() {
+      const data = Object.fromEntries(new FormData(form));
+      return {
+        host: data.host,
+        deviceId: Number(data.deviceId),
+        username: data.username,
+        password: data.password,
+        days: Number(data.days || 1),
+        date: data.date,
+        outDir: data.outDir
+      };
+    }
+
+    async function post(url) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload())
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Request failed");
+      return body;
+    }
+
+    find.addEventListener("click", async () => {
+      bar.classList.add("busy");
+      find.disabled = true;
+      status.textContent = "Looking for cameras on this network...";
+      cameras.replaceChildren();
+      try {
+        const body = await (await fetch("/api/discover")).json();
+        if (!body.cameras.length) {
+          status.textContent = "No camera answered. Type the IP and device id yourself.";
+          return;
+        }
+        for (const camera of body.cameras) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = camera.ip + "   id " + camera.id + "   " + camera.mac;
+          button.addEventListener("click", () => {
+            form.host.value = camera.ip;
+            form.deviceId.value = camera.id;
+            for (const item of cameras.querySelectorAll("button")) item.setAttribute("aria-pressed", "false");
+            button.setAttribute("aria-pressed", "true");
+          });
+          cameras.append(button);
+        }
+        status.textContent = "Select a camera, then enter its username and device password.";
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        bar.classList.remove("busy");
+        find.disabled = false;
+      }
+    });
+
+    check.addEventListener("click", async () => {
+      bar.classList.add("busy");
+      check.disabled = true;
+      status.textContent = "Checking the camera login...";
+      try {
+        const body = await post("/api/login");
+        status.textContent = "Login accepted. Camera version " + body.version + ".";
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        bar.classList.remove("busy");
+        check.disabled = false;
+      }
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      log.textContent = "";
+      setBusy(true, "Downloading. This can take a few minutes per clip.");
+      try {
+        await post("/api/sync");
+      } catch (error) {
+        setBusy(false, error.message);
+      }
+    });
+
+    stop.addEventListener("click", async () => {
+      stop.disabled = true;
+      status.textContent = "Stopping after the current clip...";
+      await fetch("/api/stop", { method: "POST" });
+    });
+
+    const events = new EventSource("/api/events");
+    events.onmessage = (event) => {
+      const body = JSON.parse(event.data);
+      if (body.type === "log") line(body.message);
+      if (body.type === "progress") line(body.file + "  " + (body.bytes / 1024 / 1024).toFixed(1) + " MB");
+      if (body.type === "error") {
+        line(body.message);
+        setBusy(false, body.message);
+      }
+      if (body.type === "done") {
+        const tail = body.stopped ? "Stopped." : "Finished.";
+        line(tail + " Saved " + body.saved + ", already on disk " + body.skipped + ".");
+        setBusy(false, tail);
+      }
+      if (body.type === "idle" && busy) setBusy(false, status.textContent);
+    };
+
+    fetch("/api/status").then((response) => response.json()).then((body) => {
+      document.querySelector("#ffmpeg").hidden = body.ffmpeg;
+    });
+  </script>
+</body>
+</html>

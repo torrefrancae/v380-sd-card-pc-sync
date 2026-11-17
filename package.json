@@ -1,0 +1,17 @@
+{
+  "name": "v380-sd-sync",
+  "description": "Copy V380 SD card recordings to MP4 files over the local network.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "tsx src/sync.ts",
+    "ui": "tsx src/server.ts",
+    "build": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
