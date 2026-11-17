@@ -107,4 +107,4 @@ ffmpeg is shipped as a separate program. Its license file is copied into the ins
 
 - `.env` and `runtime/` are gitignored. Do not commit camera passwords, account passwords, or recording files. A saved camera login stays in `runtime/` on that PC.
 - The setup page binds to loopback.
-- A download can be stopped from the page. The current clip finishes or the socket closes, and a half-written MP4 is removed.
+- A download can be stopped from the page. Stop ends it immediately, the loading bar goes away, and a half-written MP4 is removed.

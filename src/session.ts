@@ -119,6 +119,7 @@ export class CameraSocket {
   }
 
   write(data: Buffer): Promise<void> {
+    if (this.dead) return Promise.reject(this.dead);
     return new Promise((resolve, reject) => {
       let settled = false;
       const finish = (err?: Error | null) => {
@@ -132,6 +133,7 @@ export class CameraSocket {
   }
 
   close() {
+    this.fail(new Error("stopped"));
     this.buf = Buffer.alloc(0);
     this.socket.removeAllListeners();
     this.socket.destroy();

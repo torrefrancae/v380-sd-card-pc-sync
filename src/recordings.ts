@@ -23,9 +23,11 @@ function putClock(buffer: Buffer, offset: number, unixSeconds: number) {
   buffer[offset + 6] = clock.getUTCSeconds();
 }
 
-export async function listRecordings(config: CameraConfig, ticket: number, day: string): Promise<Segment[]> {
+export async function listRecordings(config: CameraConfig, ticket: number, day: string, signal?: AbortSignal): Promise<Segment[]> {
   const [year, month, date] = day.split("-").map(Number);
   const socket = await openCamera(config.host, config.port, 8000);
+  const stop = () => socket.close();
+  signal?.addEventListener("abort", stop);
   try {
     const search = Buffer.alloc(128);
     search.writeUInt32LE(361, 0);
@@ -74,6 +76,7 @@ export async function listRecordings(config: CameraConfig, ticket: number, day: 
     segments.sort((a, b) => a.start - b.start);
     return segments;
   } finally {
+    signal?.removeEventListener("abort", stop);
     socket.close();
   }
 }

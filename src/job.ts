@@ -76,8 +76,8 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-async function searchDay(config: CameraConfig, ticket: number, day: string): Promise<Segment[]> {
-  return listRecordings(config, ticket, day);
+async function searchDay(config: CameraConfig, ticket: number, day: string, signal: AbortSignal): Promise<Segment[]> {
+  return listRecordings(config, ticket, day, signal);
 }
 
 export async function runSync(options: {
@@ -109,8 +109,8 @@ export async function runSync(options: {
     let past: Segment[] = [];
     try {
       const results = await Promise.allSettled([
-        searchDay(opened.config, opened.ticket, newest),
-        backlogDay ? searchDay(opened.config, opened.ticket, backlogDay) : Promise.resolve([]),
+        searchDay(opened.config, opened.ticket, newest, options.signal),
+        backlogDay ? searchDay(opened.config, opened.ticket, backlogDay, options.signal) : Promise.resolve([]),
       ]);
       if (results[0].status === "fulfilled") fresh = results[0].value;
       if (results[1].status === "fulfilled") past = results[1].value;

@@ -279,6 +279,7 @@
     let removedFiles = new Set();
     let playToken = 0;
     let playAbort = null;
+    let halted = false;
 
     function setBusy(on, text) {
       busy = on;
@@ -945,6 +946,7 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      halted = false;
       setNote("");
       showStartedCamera();
       setBusy(true, "Saving the camera, then watching for new clips. Older clips follow.");
@@ -967,9 +969,24 @@
     });
 
     stop.addEventListener("click", async () => {
-      stop.disabled = true;
-      status.textContent = "Stopping after the current clip...";
-      await fetch("/api/stop", { method: "POST" });
+      const file = activeFile;
+      halted = true;
+      if (file) remarks.set(file, "Stopped");
+      activeFile = "";
+      activeBytes = 0;
+      activePercent = null;
+      setBusy(false, "Stopped.");
+      setNote("Stopped.");
+      if (showingFiles) renderExplorer();
+      try {
+        const response = await fetch("/api/stop", { method: "POST" });
+        if (!response.ok) throw new Error("Could not stop the download");
+      } catch (error) {
+        halted = false;
+        if (file) activeFile = file;
+        setBusy(true, error.message);
+        if (showingFiles) renderExplorer();
+      }
     });
 
     viewerClose.addEventListener("click", () => closeViewer());
@@ -982,6 +999,29 @@
     const events = new EventSource("/api/events");
     events.onmessage = (event) => {
       const body = JSON.parse(event.data);
+      if (body.type === "done") {
+        halted = false;
+        const tail = body.stopped ? "Stopped." : "Finished.";
+        activeFile = "";
+        activeBytes = 0;
+        activePercent = null;
+        setNote(tail + " Saved " + body.saved + ", already on disk " + body.skipped + ".");
+        if (showingFiles) renderExplorer();
+        setBusy(false, tail);
+        return;
+      }
+      if (body.type === "error") {
+        halted = false;
+        setNote(body.message);
+        setBusy(false, body.message);
+        return;
+      }
+      if (body.type === "idle") {
+        if (halted) return;
+        if (busy) setBusy(false, status.textContent);
+        return;
+      }
+      if (halted) return;
       if (body.type === "focus") {
         activeFile = body.file || "";
         activeBytes = 0;
@@ -998,20 +1038,6 @@
         activePercent = Number.isFinite(body.percent) ? body.percent : null;
         if (showingFiles) renderExplorer();
       }
-      if (body.type === "error") {
-        setNote(body.message);
-        setBusy(false, body.message);
-      }
-      if (body.type === "done") {
-        const tail = body.stopped ? "Stopped." : "Finished.";
-        activeFile = "";
-        activeBytes = 0;
-        activePercent = null;
-        setNote(tail + " Saved " + body.saved + ", already on disk " + body.skipped + ".");
-        if (showingFiles) renderExplorer();
-        setBusy(false, tail);
-      }
-      if (body.type === "idle" && busy) setBusy(false, status.textContent);
     };
 
     async function watchFfmpeg() {
