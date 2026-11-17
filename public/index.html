@@ -108,11 +108,16 @@
       .cols, .day-head, .file { grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) 56px minmax(0, 0.9fr) 72px; }
       .reveal { padding: 4px 8px; }
     }
-    .workspace.full { position: fixed; inset: 0; z-index: 30; grid-template-columns: minmax(0, 1fr); gap: 0; padding: 12px; background: #111; }
+    body.maximized { overflow: hidden; }
+    .workspace.full,
+    .workspace.watching.live.full { position: fixed; inset: 0; z-index: 30; width: 100%; height: 100dvh; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0; padding: 0; background: #111; }
     .workspace.full aside, .workspace.full #panel { display: none; }
-    .workspace.full #viewer { height: 100%; margin: 0; background: #111; color: #fff; border: 0; box-shadow: none; display: flex; flex-direction: column; }
+    .workspace.full #viewer { height: 100%; min-height: 0; margin: 0; padding: 8px 10px; background: #111; color: #fff; border: 0; border-radius: 0; box-shadow: none; display: flex; flex-direction: column; }
+    .workspace.full #viewer .panel-bar { flex: none; }
+    .workspace.full #viewer-note { display: none; }
     .workspace.full #viewer-title, .workspace.full #viewer-note { color: #fff; }
-    .workspace.full #viewer video, .workspace.full #viewer img { flex: 1; width: 100%; max-height: none; height: calc(100vh - 92px); }
+    .workspace.full #viewer video,
+    .workspace.watching.live.full #viewer img { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: contain; }
   </style>
 </head>
 <body>
@@ -242,7 +247,7 @@
         <div class="panel-bar">
           <h2 id="viewer-title">Clip</h2>
           <div class="actions">
-            <button type="button" id="viewer-full" class="secondary">Full screen</button>
+            <button type="button" id="viewer-full" class="secondary">Maximize</button>
             <button type="button" id="viewer-close" class="secondary">Close</button>
           </div>
         </div>
@@ -377,8 +382,8 @@
       stopLive();
       viewer.hidden = true;
       workspace.classList.remove("watching", "live", "full");
-      viewerFull.textContent = "Full screen";
-      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
+      document.body.classList.remove("maximized");
+      viewerFull.textContent = "Maximize";
       fetch("/api/preview/cancel", { method: "POST" }).catch(() => undefined);
       if (showingFiles) renderExplorer();
       if (!keepUrl) rememberView(showingFiles ? "files" : "settings");
@@ -510,13 +515,10 @@
       else history.pushState({ view }, "", next);
     }
 
-    function setFull(on, persist) {
+    function setFull(on) {
       workspace.classList.toggle("full", on);
-      viewerFull.textContent = on ? "Exit full screen" : "Full screen";
-      if (persist) {
-        if (on) viewer.requestFullscreen?.().catch(() => undefined);
-        else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => undefined);
-      }
+      document.body.classList.toggle("maximized", on);
+      viewerFull.textContent = on ? "Exit maximize" : "Maximize";
     }
 
     function savedCameraCard(id) {
@@ -539,7 +541,7 @@
         }
         if (view === "live" && card) showLive(card.camera);
         if (view === "clip" && params.get("file")) await openViewer(params.get("file"));
-        if (params.get("full") === "1" && !viewer.hidden) setFull(true, false);
+        if (params.get("full") === "1" && !viewer.hidden) setFull(true);
       } finally {
         writingUrl = false;
       }
@@ -1073,14 +1075,8 @@
     viewerClose.addEventListener("click", () => closeViewer());
     viewerFull.addEventListener("click", () => {
       const on = !workspace.classList.contains("full");
-      setFull(on, true);
+      setFull(on);
       const view = !viewer.hidden && workspace.classList.contains("live") ? "live" : (viewingFile ? "clip" : (showingFiles ? "files" : "settings"));
-      rememberView(view);
-    });
-    document.addEventListener("fullscreenchange", () => {
-      if (document.fullscreenElement || !workspace.classList.contains("full")) return;
-      setFull(false, false);
-      const view = viewingFile ? "clip" : (workspace.classList.contains("live") ? "live" : (showingFiles ? "files" : "settings"));
       rememberView(view);
     });
 
