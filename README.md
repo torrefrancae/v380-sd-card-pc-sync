@@ -19,7 +19,7 @@ Then:
 3. Click **Save camera**, or click **Start download**. Starting a download saves the camera on this PC.
 4. The next time, choose it under **Saved cameras**. It no longer appears under Find on network.
 
-The device login is the camera username and device password. It is separate from the V380 account email. Saved cameras stay on this PC. The default download is the last 7 days. A date in **Or one date** uses that day only.
+The device login is the camera username and password set in the V380 Android or iOS app: three dots at the top right of the camera, **Settings**, **Password**, **Change device password**. Enter that password twice there so it is not forgotten, then type the same username and password into this program. It is separate from the V380 account email. Saved cameras stay on this PC. The default download is the last 7 days. A date in **Or one date** uses that day only.
 
 The download stays running after the page is closed. Each check asks the camera two things at once: what is new, and which older clip is still missing. A new finished clip is copied first. Older missing clips are copied when nothing new is ready. A clip that is still being recorded is picked up after it ends. Files already in the save folder are skipped. Stop ends the watch. The program restarts itself at 3:00 and continues a download that was not stopped.
 
