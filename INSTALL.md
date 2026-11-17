@@ -54,6 +54,6 @@ Do this in the V380 app on Android or iOS before you use this program. The camer
 6. The page becomes a file list. The newest day is open. Older days stay closed until you open them.
 7. An older local copy is deleted only when a new video is saved, one in and one out. Open **Settings** to keep a different number of minutes, hours, days, weeks, or months, then click **Apply keep**. The default is 30 days. Clear the number to keep every saved video. The camera SD card is not changed.
 
-The next time, choose the camera under **Saved cameras**. Closing the page leaves the download running. **Stop** is what ends it.
+The next time, choose the camera under **Saved cameras**. Closing the page leaves the download running. **Pause** holds it, and **Play** continues from the clips already saved.
 
 A desktop and Start menu shortcut named **V380 SD Sync** opens the page again.

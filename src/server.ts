@@ -7,7 +7,7 @@ import { ensureFfmpeg, ffmpegStatus } from "./ffmpeg-setup.js";
 import { recentDays, runSync, type SyncEvent } from "./job.js";
 import { discover, login, type CameraConfig } from "./session.js";
 import { cancelPreview, clipInfo, dayFolder, pipeFile, previewFile, previewStatus, resolveClip } from "./media.js";
-import { clearDuty, msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
+import { msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
 import { ensureDefaultKeep, parseKeep, pruneKept, readKeep, writeKeep } from "./keep.js";
 import { listedClips, rememberRemoved, syncRemoved } from "./removed-clips.js";
 import { stopLive, streamLive } from "./live.js";
@@ -38,6 +38,8 @@ let activeFile = "";
 let activeBytes = 0;
 let activePercent = 0;
 let restarting = false;
+let paused = false;
+let resumeSoon = false;
 
 function send(res: http.ServerResponse, status: number, body: unknown) {
   const json = JSON.stringify(body);
@@ -45,7 +47,7 @@ function send(res: http.ServerResponse, status: number, body: unknown) {
   res.end(json);
 }
 
-function emit(event: SyncEvent | { type: "error"; message: string } | { type: "idle" }) {
+function emit(event: SyncEvent | { type: "error"; message: string } | { type: "idle" } | { type: "paused" }) {
   if (event.type === "focus") {
     activeFile = event.file;
     activeBytes = 0;
@@ -139,6 +141,7 @@ async function startSync(body: StartBody) {
   const outDir = path.resolve(body.outDir?.trim() || path.join(root, "recordings"));
   const limit = body.limit ? Number(body.limit) : Number.POSITIVE_INFINITY;
   const dayCount = Math.max(1, Math.min(60, Number(body.days || 7)));
+  paused = false;
   writeDuty({
     name: body.name?.trim() || savedCamera(config.deviceId)?.name || `Camera ${config.deviceId}`,
     host: config.host,
@@ -149,6 +152,7 @@ async function startSync(body: StartBody) {
     days: date ? 1 : dayCount,
     date,
     outDir,
+    paused: false,
   });
   rememberKeep(body, outDir);
   const controller = new AbortController();
@@ -162,7 +166,14 @@ async function startSync(body: StartBody) {
     .finally(() => {
       active = null;
       emit({ type: "idle" });
-      if (!restarting && readDuty()) setTimeout(() => { void resumeDuty(); }, 5000);
+      if (restarting) return;
+      if (resumeSoon) {
+        resumeSoon = false;
+        void resumeDuty();
+        return;
+      }
+      if (paused || readDuty()?.paused) return;
+      if (readDuty()) setTimeout(() => { void resumeDuty(); }, 5000);
     });
 }
 
@@ -189,9 +200,16 @@ function releaseOne(savedFile: string): string[] {
   return deleted;
 }
 
+function holdDuty(on: boolean) {
+  paused = on;
+  const duty = readDuty();
+  if (!duty) return;
+  writeDuty({ ...duty, paused: on });
+}
+
 function resumeDuty() {
   const duty = readDuty();
-  if (!duty || active) return;
+  if (!duty || duty.paused || paused || active) return;
   void startSync({
     name: duty.name,
     host: duty.host,
@@ -280,7 +298,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/status") {
-      send(res, 200, { ...ffmpegStatus(), running: active !== null, activeFile, activeBytes, activePercent });
+      send(res, 200, { ...ffmpegStatus(), running: active !== null, paused: paused || Boolean(readDuty()?.paused), activeFile, activeBytes, activePercent });
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/saved") {
@@ -341,10 +359,21 @@ const server = http.createServer(async (req, res) => {
       send(res, 202, { ok: true, cameras: savedCameras() });
       return;
     }
-    if (req.method === "POST" && url.pathname === "/api/stop") {
-      clearDuty();
+    if (req.method === "POST" && url.pathname === "/api/pause") {
+      if (!active && !readDuty()) throw new Error("Nothing is downloading");
+      holdDuty(true);
+      emit({ type: "paused" });
       active?.abort();
       send(res, 200, { ok: true });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/resume") {
+      const duty = readDuty();
+      if (!duty) throw new Error("Nothing is paused");
+      holdDuty(false);
+      if (active) resumeSoon = true;
+      else resumeDuty();
+      send(res, 202, { ok: true });
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/live/stop") {
@@ -404,6 +433,7 @@ server.listen(port, "127.0.0.1", () => {
   void ensureFfmpeg().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : error);
   });
+  paused = Boolean(readDuty()?.paused);
   resumeDuty();
   const sweep = setInterval(() => sweepOldVideos(), 15_000);
   sweep.unref();

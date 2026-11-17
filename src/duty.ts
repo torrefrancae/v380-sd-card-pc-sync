@@ -12,6 +12,7 @@ export interface Duty {
   days: number;
   date: string;
   outDir: string;
+  paused?: boolean;
 }
 
 function dutyFile(): string {

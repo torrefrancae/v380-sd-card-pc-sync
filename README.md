@@ -21,7 +21,7 @@ Then:
 
 The device login is the camera username and password set in the V380 Android or iOS app: three dots at the top right of the camera, **Settings**, **Password**, **Change device password**. Enter that password twice there so it is not forgotten, then type the same username and password into this program. It is separate from the V380 account email. Saved cameras stay on this PC. The default download is the last 7 days. A date in **Or one date** uses that day only.
 
-The download stays running after the page is closed. Each check takes the most recent finished clip. When that day has no finished clip left to copy, the next most recent day is used, again starting with its newest clip. A clip that is still being recorded is picked up after it ends. Files already in the save folder are skipped. Stop ends the watch. The program restarts itself at 3:00 and continues a download that was not stopped.
+The download stays running after the page is closed. Each check takes the most recent finished clip. When that day has no finished clip left to copy, the next most recent day is used, again starting with its newest clip. A clip that is still being recorded is picked up after it ends. Files already in the save folder are skipped. Pause holds the download, and Play continues it. The program restarts itself at 3:00 and continues a download that is not paused.
 
 After a download starts, the page becomes a file list grouped by day. The newest day is open. Older days stay closed until opened. Each clip shows its date and time, copy progress, and a remark such as New, Older, or Saved. Click a clip to play it in the panel beside the list. While a clip is open, the list keeps only the file name so the picture can use the rest of the page. One clip plays at a time, in this page. A **Show in Explorer** button opens that day's folder on the PC.
 
@@ -92,7 +92,7 @@ ffmpeg is shipped as a separate program. Its license file is copied into the ins
 | `src/server.ts` | Local page and HTTP API |
 | `src/session.ts` | Discovery, login, media key |
 | `src/recordings.ts` | SD index, playback, MP4 mux |
-| `src/job.ts` | Live download loop, new clips first, stop |
+| `src/job.ts` | Live download loop, newest finished clip first |
 | `src/saved-cameras.ts` | Camera logins saved on this PC |
 | `src/duty.ts` | Resume a download after the 3:00 restart |
 | `src/media.ts` | Saved clips, playback, and folder open |
@@ -107,4 +107,4 @@ ffmpeg is shipped as a separate program. Its license file is copied into the ins
 
 - `.env` and `runtime/` are gitignored. Do not commit camera passwords, account passwords, or recording files. A saved camera login stays in `runtime/` on that PC.
 - The setup page binds to loopback.
-- A download can be stopped from the page. Stop ends it immediately, the loading bar goes away, and a half-written MP4 is removed.
+- Pause holds a download. The loading bar goes away, a half-written MP4 is removed, and Play continues from the clips already saved.

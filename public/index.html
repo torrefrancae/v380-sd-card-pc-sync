@@ -76,7 +76,7 @@
     .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
     button { border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-weight: 650; cursor: pointer; background: #1a1d21; color: #fff; }
     button.secondary { background: #e8edf2; color: #1a1d21; }
-    #start, #applyKeep { background: var(--accent); color: #fff; }
+    #start, #applyKeep, #pause.play { background: var(--accent); color: #fff; }
     #settings { background: #fff; color: #1a1d21; border: 1px solid var(--line); }
     button:disabled { opacity: 0.55; cursor: default; }
     .cameras { display: flex; flex-direction: column; gap: 8px; }
@@ -143,7 +143,7 @@
         <div class="panel-bar">
           <h2 id="panel-title">Setup</h2>
           <div class="actions">
-            <button type="button" id="stop" class="secondary" disabled hidden>Stop</button>
+            <button type="button" id="pause" class="secondary" hidden>Pause</button>
             <button type="button" id="settings" class="secondary" hidden>Settings</button>
           </div>
         </div>
@@ -279,7 +279,7 @@
     const save = document.querySelector("#save");
     const check = document.querySelector("#check");
     const start = document.querySelector("#start");
-    const stop = document.querySelector("#stop");
+    const pause = document.querySelector("#pause");
     const remove = document.querySelector("#remove");
     const applyKeep = document.querySelector("#applyKeep");
     const form = document.querySelector("#form");
@@ -300,6 +300,8 @@
     let playToken = 0;
     let playAbort = null;
     let halted = false;
+    let paused = false;
+    let resuming = false;
     let writingUrl = false;
 
     function setBusy(on, text) {
@@ -311,9 +313,16 @@
       check.disabled = on;
       remove.disabled = on;
       start.disabled = on;
-      stop.disabled = !on;
-      stop.hidden = !on;
+      syncPauseButton();
       status.textContent = text || "";
+    }
+
+    function syncPauseButton() {
+      const show = busy || paused;
+      pause.hidden = !show;
+      pause.disabled = !show;
+      pause.textContent = paused && !busy ? "Play" : "Pause";
+      pause.classList.toggle("play", paused && !busy);
     }
 
     function clipButton(file) {
@@ -1030,6 +1039,8 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       halted = false;
+      paused = false;
+      resuming = false;
       setNote("");
       showStartedCamera();
       setBusy(true, "Saving the camera, then watching for new clips. Older clips follow.");
@@ -1051,22 +1062,46 @@
       }
     });
 
-    stop.addEventListener("click", async () => {
+    pause.addEventListener("click", async () => {
+      if (paused && !busy) {
+        paused = false;
+        halted = false;
+        resuming = true;
+        setBusy(true, "Resuming.");
+        setNote("Resuming.");
+        try {
+          const response = await fetch("/api/resume", { method: "POST" });
+          if (!response.ok) throw new Error("Could not resume the download");
+        } catch (error) {
+          paused = true;
+          halted = true;
+          resuming = false;
+          setBusy(false, error.message);
+          setNote("Paused.");
+        }
+        return;
+      }
       const file = activeFile;
+      paused = true;
       halted = true;
-      if (file) remarks.set(file, "Stopped");
+      resuming = false;
+      if (file) remarks.set(file, "Paused");
       activeFile = "";
       activeBytes = 0;
       activePercent = null;
-      setBusy(false, "Stopped.");
-      setNote("Stopped.");
+      setBusy(false, "Paused.");
+      setNote("Paused.");
       if (showingFiles) renderExplorer();
       try {
-        const response = await fetch("/api/stop", { method: "POST" });
-        if (!response.ok) throw new Error("Could not stop the download");
+        const response = await fetch("/api/pause", { method: "POST" });
+        if (!response.ok) throw new Error("Could not pause the download");
       } catch (error) {
+        paused = false;
         halted = false;
-        if (file) activeFile = file;
+        if (file) {
+          remarks.delete(file);
+          activeFile = file;
+        }
         setBusy(true, error.message);
         if (showingFiles) renderExplorer();
       }
@@ -1088,9 +1123,33 @@
     const events = new EventSource("/api/events");
     events.onmessage = (event) => {
       const body = JSON.parse(event.data);
+      if (body.type === "paused") {
+        paused = true;
+        halted = true;
+        resuming = false;
+        if (activeFile) remarks.set(activeFile, "Paused");
+        activeFile = "";
+        activeBytes = 0;
+        activePercent = null;
+        setNote("Paused.");
+        if (showingFiles) renderExplorer();
+        setBusy(false, "Paused.");
+        return;
+      }
       if (body.type === "done") {
+        if (paused) {
+          activeFile = "";
+          activeBytes = 0;
+          activePercent = null;
+          setNote("Paused.");
+          if (showingFiles) renderExplorer();
+          setBusy(false, "Paused.");
+          return;
+        }
+        if (body.stopped && (busy || resuming)) return;
         halted = false;
-        const tail = body.stopped ? "Stopped." : "Finished.";
+        resuming = false;
+        const tail = "Finished.";
         activeFile = "";
         activeBytes = 0;
         activePercent = null;
@@ -1100,17 +1159,20 @@
         return;
       }
       if (body.type === "error") {
+        if (paused) return;
         halted = false;
+        resuming = false;
         setNote(body.message);
         setBusy(false, body.message);
         return;
       }
       if (body.type === "idle") {
-        if (halted) return;
+        if (halted || paused || resuming) return;
         if (busy) setBusy(false, status.textContent);
         return;
       }
       if (halted) return;
+      resuming = false;
       if (body.type === "focus") {
         activeFile = body.file || "";
         activeBytes = 0;
@@ -1156,6 +1218,13 @@
     renderFound();
     window.addEventListener("popstate", () => { applyRoute().catch(() => undefined); });
     fetch("/api/status").then((response) => response.json()).then((body) => {
+      if (body.paused && !body.running) {
+        paused = true;
+        halted = true;
+        setBusy(false, "Paused.");
+        setNote("Paused.");
+        return;
+      }
       if (!body.running) return;
       activeFile = body.activeFile || "";
       activeBytes = body.activeBytes || 0;
