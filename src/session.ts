@@ -125,6 +125,8 @@ export class CameraSocket {
   }
 
   close() {
+    this.buf = Buffer.alloc(0);
+    this.socket.removeAllListeners();
     this.socket.destroy();
   }
 }

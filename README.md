@@ -14,15 +14,16 @@ The installer does not need administrator rights. It places the app in the user 
 
 Then:
 
-1. Install the V380 app for Windows and sign in with the same account that already has the camera.
-2. Click **Scan V380**. That reads the camera list saved by the V380 app on this PC and fills the device login.
-3. Select the camera. If it is on this network, the current IP is used.
-4. Click **Check login**.
-5. Click **Start download**.
+1. Click **Find on network**, or **Scan V380** after signing in to the V380 app on this PC.
+2. Select the camera and enter its device username and device password.
+3. Click **Save camera**, or click **Start download**. Starting a download saves the camera on this PC.
+4. The next time, choose it under **Saved cameras**. It no longer appears under Find on network.
 
-The device login is the camera username and device password stored by the V380 app. It is separate from the account email. If the V380 app has no cameras yet, add the camera there and scan again. **Find on network** still lists cameras that answer on the LAN, and those still need the device login typed in.
+The device login is the camera username and device password. It is separate from the V380 account email. Saved cameras stay on this PC. The default download is the last 7 days. A date in **Or one date** uses that day only.
 
-Finished clips are written to the save folder. Files that are already there are skipped, so a later run only copies what is new. Each clip is about four minutes. A full day takes a few hours because the camera plays each recording out over the network.
+The download stays running after the page is closed. Each check asks the camera two things at once: what is new, and which older clip is still missing. A new finished clip is copied first. Older missing clips are copied when nothing new is ready. A clip that is still being recorded is picked up after it ends. Files already in the save folder are skipped. Stop ends the watch. The program restarts itself at 3:00 and continues a download that was not stopped.
+
+After a download starts, the page becomes a file list grouped by day. The newest day is open. Older days stay closed until opened. Each clip shows its date and time, copy progress, and a remark such as New, Older, or Saved. Click a clip to play it. A **Show in Explorer** button opens that day's folder on the PC.
 
 The page listens on `http://127.0.0.1:8787` only. The password is sent to the program on that PC and is not forwarded to any other machine.
 
@@ -89,13 +90,17 @@ ffmpeg is shipped as a separate program. Its license file is copied into the ins
 | `src/server.ts` | Local page and HTTP API |
 | `src/session.ts` | Discovery, login, media key |
 | `src/recordings.ts` | SD index, playback, MP4 mux |
-| `src/job.ts` | Download loop, skip existing files, stop |
-| `public/index.html` | Setup page |
+| `src/job.ts` | Live download loop, new clips first, stop |
+| `src/saved-cameras.ts` | Camera logins saved on this PC |
+| `src/duty.ts` | Resume a download after the 3:00 restart |
+| `src/media.ts` | Saved clips, playback, and folder open |
+| `public/index.html` | Setup page and file list |
+| `public/watch.html` | Clip player |
 | `installer/` | Inno Setup script and silent launcher |
 | `.github/workflows/windows-installer.yml` | Builds the downloadable setup |
 
 ## Security
 
-- `.env` is gitignored. Do not commit camera passwords, account passwords, or recording files.
+- `.env` and `runtime/` are gitignored. Do not commit camera passwords, account passwords, or recording files. A saved camera login stays in `runtime/` on that PC.
 - The setup page binds to loopback.
 - A download can be stopped from the page. The current clip finishes or the socket closes, and a half-written MP4 is removed.

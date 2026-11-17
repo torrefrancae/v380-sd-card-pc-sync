@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clip</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font: 15px/1.45 "Segoe UI", sans-serif; background: #1c1915; color: #fffdf8; }
+    main { max-width: 960px; margin: 0 auto; padding: 16px; }
+    video { width: 100%; background: #000; }
+    p { color: #e7d7c3; }
+    a { color: #f0c9a0; }
+  </style>
+</head>
+<body>
+  <main>
+    <p id="note">Opening the clip...</p>
+    <video id="player" controls autoplay></video>
+  </main>
+  <script>
+    const note = document.querySelector("#note");
+    const player = document.querySelector("#player");
+    const params = new URLSearchParams(location.search);
+
+    function playable(codec) {
+      if (codec !== "hevc" && codec !== "h265") return true;
+      const probe = document.createElement("video");
+      return probe.canPlayType('video/mp4; codecs="hvc1.1.6.L120.B0"') !== "" || probe.canPlayType('video/mp4; codecs="hev1.1.6.L120.B0"') !== "";
+    }
+
+    async function direct(url) {
+      note.textContent = "";
+      player.src = url;
+      player.addEventListener("error", () => { prepare(); }, { once: true });
+    }
+
+    async function prepare() {
+      note.textContent = "Preparing a copy this browser can play. This happens once per clip.";
+      for (;;) {
+        const response = await fetch("/api/preview?" + params.toString());
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Could not prepare the clip");
+        if (body.ready) {
+          note.textContent = "";
+          player.src = body.url;
+          return;
+        }
+        if (body.message) note.textContent = body.message;
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    async function openClip() {
+      const response = await fetch("/api/clip?" + params.toString());
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Could not open the clip");
+      document.title = params.get("file") || "Clip";
+      if (!body.exists) {
+        note.textContent = body.message;
+        return;
+      }
+      if (playable(body.codec)) direct(body.media);
+      else prepare();
+    }
+
+    openClip().catch((error) => {
+      note.textContent = error.message;
+    });
+  </script>
+</body>
+</html>

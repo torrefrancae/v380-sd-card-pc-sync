@@ -6,10 +6,12 @@ import { appRoot } from "./app-root.js";
 import { ensureFfmpeg, ffmpegStatus } from "./ffmpeg-setup.js";
 import { recentDays, runSync, type SyncEvent } from "./job.js";
 import { discover, login, type CameraConfig } from "./session.js";
+import { clipInfo, dayFolder, listClips, pipeFile, previewFile, previewStatus, resolveClip } from "./media.js";
+import { clearDuty, msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
+import { forgetCamera, rememberCamera, savedCamera, savedCameras, savedIds } from "./saved-cameras.js";
 import { deviceFromV380, readV380Devices } from "./v380-store.js";
 
 const root = appRoot();
-const page = fs.readFileSync(path.join(root, "public", "index.html"));
 
 interface StartBody {
   host?: string;
@@ -17,6 +19,7 @@ interface StartBody {
   deviceId?: number;
   username?: string;
   password?: string;
+  name?: string;
   days?: number;
   date?: string;
   outDir?: string;
@@ -26,6 +29,10 @@ interface StartBody {
 
 const listeners = new Set<http.ServerResponse>();
 let active: AbortController | null = null;
+let activeFile = "";
+let activeBytes = 0;
+let activePercent = 0;
+let restarting = false;
 
 function send(res: http.ServerResponse, status: number, body: unknown) {
   const json = JSON.stringify(body);
@@ -34,8 +41,33 @@ function send(res: http.ServerResponse, status: number, body: unknown) {
 }
 
 function emit(event: SyncEvent | { type: "error"; message: string } | { type: "idle" }) {
+  if (event.type === "focus") {
+    activeFile = event.file;
+    activeBytes = 0;
+    activePercent = 0;
+  }
+  if (event.type === "progress") {
+    activeFile = event.file;
+    activeBytes = event.bytes;
+    activePercent = event.percent;
+  }
+  if (event.type === "done" || event.type === "error" || event.type === "idle") {
+    activeFile = "";
+    activeBytes = 0;
+    activePercent = 0;
+  }
   const line = `data: ${JSON.stringify(event)}\n\n`;
-  for (const listener of listeners) listener.write(line);
+  for (const listener of listeners) {
+    if (listener.destroyed || listener.writableEnded) {
+      listeners.delete(listener);
+      continue;
+    }
+    try {
+      listener.write(line);
+    } catch {
+      listeners.delete(listener);
+    }
+  }
 }
 
 async function readJson(req: http.IncomingMessage): Promise<StartBody> {
@@ -58,6 +90,13 @@ async function cameraFrom(body: StartBody): Promise<CameraConfig> {
   let password = body.password ?? "";
   let port = Number(body.port || 8800);
   if (!Number.isInteger(deviceId) || deviceId <= 0) throw new Error("Enter the camera device id");
+  const kept = savedCamera(deviceId);
+  if (kept) {
+    host = host || kept.host;
+    username = username || kept.username;
+    password = password || kept.password;
+    if (!body.port) port = kept.port;
+  }
   if (!username || !password || !host) {
     const saved = await deviceFromV380(deviceId);
     if (saved) {
@@ -68,7 +107,7 @@ async function cameraFrom(body: StartBody): Promise<CameraConfig> {
     }
   }
   if (!host) throw new Error("Enter the camera IP address");
-  if (!username || !password) throw new Error("Install V380, sign in, and scan again, or type the device login");
+  if (!username || !password) throw new Error("Enter the username and device password");
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Enter a valid port");
   return { host, port, deviceId, username, password };
 }
@@ -77,14 +116,34 @@ async function startSync(body: StartBody) {
   if (active) throw new Error("A download is already running");
   await ensureFfmpeg();
   const config = await cameraFrom(body);
+  rememberCamera({
+    id: config.deviceId,
+    name: body.name?.trim() || savedCamera(config.deviceId)?.name || `Camera ${config.deviceId}`,
+    host: config.host,
+    port: config.port,
+    username: config.username,
+    password: config.password,
+  });
   const date = (body.date ?? "").trim();
-  const days = date ? [date] : recentDays(Math.max(1, Math.min(60, Number(body.days || 1))));
+  const days = date ? [date] : recentDays(Math.max(1, Math.min(60, Number(body.days || 7))));
   if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Use a date like 2026-11-17");
   const outDir = path.resolve(body.outDir?.trim() || path.join(root, "recordings"));
   const limit = body.limit ? Number(body.limit) : Number.POSITIVE_INFINITY;
+  const dayCount = Math.max(1, Math.min(60, Number(body.days || 7)));
+  writeDuty({
+    name: body.name?.trim() || savedCamera(config.deviceId)?.name || `Camera ${config.deviceId}`,
+    host: config.host,
+    port: config.port,
+    deviceId: config.deviceId,
+    username: config.username,
+    password: config.password,
+    days: date ? 1 : dayCount,
+    date,
+    outDir,
+  });
   const controller = new AbortController();
   active = controller;
-  emit({ type: "log", message: "Starting download" });
+  emit({ type: "log", message: "Starting download. Closing the page leaves this running." });
   void runSync({ config, days, outDir, limit, signal: controller.signal }, emit)
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -93,23 +152,111 @@ async function startSync(body: StartBody) {
     .finally(() => {
       active = null;
       emit({ type: "idle" });
+      if (!restarting && readDuty()) setTimeout(() => { void resumeDuty(); }, 5000);
     });
+}
+
+function resumeDuty() {
+  const duty = readDuty();
+  if (!duty || active) return;
+  void startSync({
+    name: duty.name,
+    host: duty.host,
+    port: duty.port,
+    deviceId: duty.deviceId,
+    username: duty.username,
+    password: duty.password,
+    days: duty.days,
+    date: duty.date,
+    outDir: duty.outDir,
+  }).catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
+  });
 }
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   try {
-    if (req.method === "GET" && url.pathname === "/") {
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(page);
+    if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/watch")) {
+      const file = url.pathname === "/watch" ? "watch.html" : "index.html";
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(fs.readFileSync(path.join(root, "public", file)));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/reveal") {
+      const body = await readJson(req);
+      const folder = dayFolder(body.outDir, (body.date ?? "").trim());
+      fs.mkdirSync(folder, { recursive: true });
+      const opener = process.platform === "win32"
+        ? spawn("explorer.exe", [folder])
+        : spawn(process.platform === "darwin" ? "open" : "xdg-open", [folder]);
+      opener.on("error", () => undefined);
+      opener.unref();
+      send(res, 200, { ok: true });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/clips") {
+      send(res, 200, { clips: listClips(url.searchParams.get("outDir") ?? undefined) });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/clip") {
+      send(res, 200, await clipInfo(url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? ""));
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/preview") {
+      await ensureFfmpeg();
+      send(res, 200, await previewStatus(url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? ""));
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/media") {
+      const clip = resolveClip(url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? "");
+      if (!clip || !fs.existsSync(clip)) {
+        send(res, 404, { error: "Clip not found" });
+        return;
+      }
+      pipeFile(req, res, clip);
+      return;
+    }
+    if (req.method === "GET" && url.pathname.startsWith("/preview/")) {
+      const id = url.pathname.slice("/preview/".length).replace(/\.mp4$/, "");
+      const clip = previewFile(id);
+      if (!clip) {
+        send(res, 404, { error: "Clip not found" });
+        return;
+      }
+      pipeFile(req, res, clip);
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/status") {
-      send(res, 200, { ...ffmpegStatus(), running: active !== null });
+      send(res, 200, { ...ffmpegStatus(), running: active !== null, activeFile, activeBytes, activePercent });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/saved") {
+      send(res, 200, { cameras: savedCameras() });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/saved") {
+      const body = await readJson(req);
+      const config = await cameraFrom(body);
+      const camera = rememberCamera({
+        id: config.deviceId,
+        name: body.name?.trim() || savedCamera(config.deviceId)?.name || `Camera ${config.deviceId}`,
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: config.password,
+      });
+      send(res, 200, { ok: true, id: camera.id, name: camera.name });
+      return;
+    }
+    if (req.method === "DELETE" && url.pathname === "/api/saved") {
+      forgetCamera(Number(url.searchParams.get("id")));
+      send(res, 200, { ok: true });
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/discover") {
-      const cameras = await discover(2000);
+      const known = savedIds();
+      const cameras = (await discover(2000)).filter((camera) => !known.has(camera.id));
       send(res, 200, { cameras });
       return;
     }
@@ -117,7 +264,7 @@ const server = http.createServer(async (req, res) => {
       const saved = await readV380Devices();
       const live = await discover(2000);
       send(res, 200, {
-        cameras: saved.map((device) => {
+        cameras: saved.filter((device) => !savedIds().has(device.id)).map((device) => {
           const match = live.find((camera) => camera.id === device.id);
           return {
             id: device.id,
@@ -143,6 +290,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/stop") {
+      clearDuty();
       active?.abort();
       send(res, 200, { ok: true });
       return;
@@ -155,7 +303,9 @@ const server = http.createServer(async (req, res) => {
       });
       res.write("data: {\"type\":\"hello\"}\n\n");
       listeners.add(res);
-      req.on("close", () => listeners.delete(res));
+      const drop = () => listeners.delete(res);
+      req.on("close", drop);
+      res.on("close", drop);
       return;
     }
     send(res, 404, { error: "Not found" });
@@ -166,13 +316,41 @@ const server = http.createServer(async (req, res) => {
 });
 
 const port = Number(process.env.PORT || 8787);
+server.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EADDRINUSE") process.exit(86);
+  console.error(error.message);
+  process.exit(1);
+});
 server.listen(port, "127.0.0.1", () => {
   const address = `http://127.0.0.1:${port}`;
   console.log(`V380 sync is at ${address}`);
+  prunePreviews();
   void ensureFfmpeg().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : error);
   });
+  resumeDuty();
+  const restart = setTimeout(() => {
+    restarting = true;
+    active?.abort();
+    setTimeout(() => process.exit(0), 800);
+  }, msUntilThreeAm(new Date()));
+  restart.unref();
+  if (process.env.V380_NO_OPEN) return;
   const opener = process.platform === "win32" ? spawn("cmd", ["/c", "start", "", address]) : spawn(process.platform === "darwin" ? "open" : "xdg-open", [address]);
   opener.on("error", () => undefined);
   opener.unref();
 });
+
+function prunePreviews() {
+  const dir = path.join(root, "runtime", "previews");
+  if (!fs.existsSync(dir)) return;
+  const cutoff = Date.now() - 3 * 24 * 60 * 60 * 1000;
+  for (const name of fs.readdirSync(dir)) {
+    const full = path.join(dir, name);
+    try {
+      if (fs.statSync(full).mtimeMs < cutoff) fs.rmSync(full, { force: true });
+    } catch {
+      /* A preview can be open while it is pruned. */
+    }
+  }
+}

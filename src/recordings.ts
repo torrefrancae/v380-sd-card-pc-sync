@@ -192,7 +192,7 @@ export async function downloadSegment(config: CameraConfig, ticket: number, segm
   return codec;
 }
 
-export function mux(codec: "hevc" | "h264", elementary: string, output: string): Promise<void> {
+export function mux(codec: "hevc" | "h264", elementary: string, output: string, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(ffmpegBin(), [
       "-y", "-hide_banner", "-loglevel", "error",
@@ -200,10 +200,16 @@ export function mux(codec: "hevc" | "h264", elementary: string, output: string):
       "-c", "copy", output,
     ], { stdio: ["ignore", "ignore", "pipe"] });
     let error = "";
-    child.stderr.on("data", (chunk: Buffer) => { error += chunk.toString(); });
+    const stop = () => child.kill();
+    signal?.addEventListener("abort", stop);
+    child.stderr.on("data", (chunk: Buffer) => {
+      error = (error + chunk.toString()).slice(-2000);
+    });
     child.on("error", reject);
     child.on("close", (code) => {
-      if (code === 0) resolve();
+      signal?.removeEventListener("abort", stop);
+      if (signal?.aborted) reject(new Error("stopped"));
+      else if (code === 0) resolve();
       else reject(new Error(error.trim() || `ffmpeg exited ${code}`));
     });
   });
@@ -215,7 +221,7 @@ export async function saveClip(config: CameraConfig, ticket: number, segment: Se
   const codec = await downloadSegment(config, ticket, segment, elementary, onBytes, signal);
   const temp = `${output}.partial.mp4`;
   try {
-    await mux(codec, elementary, temp);
+    await mux(codec, elementary, temp, signal);
     fs.renameSync(temp, output);
   } finally {
     fs.rmSync(elementary, { force: true });
