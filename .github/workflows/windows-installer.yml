@@ -28,7 +28,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path build/win/dist, build/win/public, build/win/runtime | Out-Null
           Copy-Item dist/server.mjs build/win/dist/
-          Copy-Item public/index.html build/win/public/
+          Copy-Item public/* build/win/public/
           Copy-Item installer/launch.vbs build/win/
           Copy-Item node_modules/sql.js/dist/sql-wasm.wasm build/win/runtime/
           Copy-Item LICENSE build/win/
