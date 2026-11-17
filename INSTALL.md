@@ -52,7 +52,7 @@ Do this in the V380 app on Android or iOS before you use this program. The camer
 4. Enter the **username** and **password** you set in the phone app. Use that same login here.
 5. Click **Save camera**, or click **Start download**. Starting a download saves the camera on this PC.
 6. The page becomes a file list. The newest day is open. Older days stay closed until you open them.
-7. To drop older copies from this PC, open **Settings**, enter how many minutes, hours, days, weeks, or months to keep, and click **Apply keep**. The camera SD card is not changed. Leave the number empty to keep every saved video.
+7. Local copies older than 30 days are deleted from this PC. Open **Settings** to keep a different number of minutes, hours, days, weeks, or months, then click **Apply keep**. Clear the number to keep every saved video. The camera SD card is not changed.
 
 The next time, choose the camera under **Saved cameras**. Closing the page leaves the download running. **Stop** is what ends it.
 

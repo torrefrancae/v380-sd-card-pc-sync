@@ -132,7 +132,7 @@
         <div class="row">
           <div>
             <label for="keepAmount">Keep local videos</label>
-            <input id="keepAmount" name="keepAmount" type="number" min="1" step="1" placeholder="Keep all">
+            <input id="keepAmount" name="keepAmount" type="number" min="1" step="1" value="30" placeholder="30">
           </div>
           <div>
             <label for="keepUnit">Then delete older</label>
@@ -145,7 +145,7 @@
             </select>
           </div>
         </div>
-        <p class="empty">Leave the number empty to keep every saved video. A number deletes older videos from this PC only. The camera SD card is not changed. Minutes are there so a short limit can be checked.</p>
+        <p class="empty">30 days is the default. Older videos are deleted from this PC. Clear the number and apply to keep every saved video. The camera SD card is not changed.</p>
         <div class="actions">
           <button type="button" id="save" class="secondary">Save camera</button>
           <button type="button" id="check" class="secondary">Check login</button>
@@ -860,7 +860,7 @@
     watchFfmpeg();
     fetch("/api/keep").then((response) => response.json()).then((body) => {
       if (body.unit) form.keepUnit.value = body.unit;
-      if (body.amount) form.keepAmount.value = body.amount;
+      form.keepAmount.value = body.amount || "";
     }).catch(() => undefined).finally(() => {
       keepLoaded = true;
     });

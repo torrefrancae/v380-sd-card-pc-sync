@@ -25,7 +25,7 @@ The download stays running after the page is closed. Each check asks the camera 
 
 After a download starts, the page becomes a file list grouped by day. The newest day is open. Older days stay closed until opened. Each clip shows its date and time, copy progress, and a remark such as New, Older, or Saved. Click a clip to play it in the panel beside the list. One clip plays at a time, in this page. A **Show in Explorer** button opens that day's folder on the PC.
 
-**Keep local videos** limits how long those copies stay on the PC. Enter a number of minutes, hours, days, weeks, or months, then **Apply keep**. Older saved videos are deleted from this PC. The camera SD card is left as it is. Leave the number empty to keep every saved video. Minutes are included so a short limit, such as 10 minutes, can be checked.
+**Keep local videos** limits how long those copies stay on the PC. The default is 30 days. Older saved videos are deleted from this PC. Change the number of minutes, hours, days, weeks, or months, then **Apply keep**. Clear the number to keep every saved video. The camera SD card is left as it is.
 
 The page listens on `http://127.0.0.1:8787` only. The password is sent to the program on that PC and is not forwarded to any other machine.
 

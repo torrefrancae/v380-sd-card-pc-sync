@@ -8,7 +8,7 @@ import { recentDays, runSync, type SyncEvent } from "./job.js";
 import { discover, login, type CameraConfig } from "./session.js";
 import { cancelPreview, clipInfo, dayFolder, listClips, pipeFile, previewFile, previewStatus, resolveClip } from "./media.js";
 import { clearDuty, msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
-import { parseKeep, pruneKept, readKeep, writeKeep } from "./keep.js";
+import { ensureDefaultKeep, parseKeep, pruneKept, readKeep, writeKeep } from "./keep.js";
 import { forgetCamera, rememberCamera, savedCamera, savedCameras, savedIds } from "./saved-cameras.js";
 import { deviceFromV380, readV380Devices } from "./v380-store.js";
 
@@ -364,6 +364,8 @@ server.on("error", (error: NodeJS.ErrnoException) => {
 server.listen(port, "127.0.0.1", () => {
   const address = `http://127.0.0.1:${port}`;
   console.log(`V380 sync is at ${address}`);
+  ensureDefaultKeep(path.join(root, "recordings"));
+  sweepOldVideos();
   prunePreviews();
   void ensureFfmpeg().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : error);

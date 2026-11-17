@@ -18,26 +18,41 @@ function keepFile(): string {
   return path.join(appRoot(), "runtime", "keep.json");
 }
 
-export function readKeep(): Keep | null {
+function readStored(): { amount: number | null; unit: KeepUnit; outDir: string } | null {
   try {
-    const saved = JSON.parse(fs.readFileSync(keepFile(), "utf8")) as Keep;
-    if (!saved || !Number.isInteger(saved.amount) || saved.amount < 1) return null;
-    if (!KEEP_UNITS.includes(saved.unit) || !saved.outDir) return null;
-    return saved;
+    const saved = JSON.parse(fs.readFileSync(keepFile(), "utf8")) as { amount?: number | null; unit?: KeepUnit; outDir?: string };
+    if (!saved || !saved.unit || !KEEP_UNITS.includes(saved.unit)) return null;
+    if (saved.amount === null) return { amount: null, unit: saved.unit, outDir: saved.outDir ?? "" };
+    if (!Number.isInteger(saved.amount) || saved.amount < 1 || !saved.outDir) return null;
+    return { amount: saved.amount, unit: saved.unit, outDir: saved.outDir };
   } catch {
     return null;
   }
 }
 
+export function readKeep(): Keep | null {
+  const saved = readStored();
+  if (!saved || saved.amount === null || !saved.outDir) return null;
+  return { amount: saved.amount, unit: saved.unit, outDir: saved.outDir };
+}
+
+/* A new install keeps 30 days. A saved empty amount stays empty across restarts. */
+export function ensureDefaultKeep(outDir: string) {
+  if (fs.existsSync(keepFile())) return;
+  writeKeep({ amount: 30, unit: "days", outDir: resolveOutDir(outDir) });
+}
+
 export function writeKeep(keep: Keep | null) {
   const dest = keepFile();
-  if (!keep) {
-    fs.rmSync(dest, { force: true });
-    return;
-  }
+  const previous = readStored();
+  const stored = keep ?? {
+    amount: null,
+    unit: previous?.unit ?? "days",
+    outDir: previous?.outDir ?? "",
+  };
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const temp = `${dest}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(keep), { mode: 0o600 });
+  fs.writeFileSync(temp, JSON.stringify(stored), { mode: 0o600 });
   fs.renameSync(temp, dest);
 }
 
