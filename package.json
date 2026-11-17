@@ -1,5 +1,5 @@
 {
-  "name": "v380-sd-sync",
+  "name": "v380-sd-card-download",
   "description": "Copy V380 SD card recordings to MP4 files over the local network.",
   "private": true,
   "type": "module",
