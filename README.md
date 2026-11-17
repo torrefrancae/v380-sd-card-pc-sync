@@ -1,6 +1,6 @@
-# V380 SD card download
+# V380 SD card PC sync
 
-A local program that copies recordings off a V380 CCTV camera SD card and saves them as normal MP4 files.
+A local program that syncs recordings from a V380 CCTV camera SD card onto a PC and saves them as normal MP4 files.
 
 The camera stays on the same network as the PC. Nothing in this project signs in to a V380 cloud account, and camera passwords are never stored in the repository.
 
@@ -8,7 +8,7 @@ The camera stays on the same network as the PC. Nothing in this project signs in
 
 ## Install on Windows
 
-Download **V380SdSync-Setup.exe** from [Releases](https://github.com/torrefrancae/v380-sd-card-download/releases).
+Download **V380SdSync-Setup.exe** from [Releases](https://github.com/torrefrancae/v380-sd-card-pc-sync/releases).
 
 The installer does not need administrator rights. It places the app in the user profile, adds a Start menu and desktop shortcut, and opens the setup page. Node.js and ffmpeg are inside the installer, so a Windows PC does not need them installed separately.
 
@@ -20,7 +20,7 @@ Then:
 4. Click **Check login**.
 5. Click **Start download**.
 
-Finished clips are written to the save folder. Files that are already there are skipped, so the same download can be run again later. Each clip is about four minutes. A full day takes a few hours because the camera plays each recording out over the network.
+Finished clips are written to the save folder. Files that are already there are skipped, so a later run only copies what is new. Each clip is about four minutes. A full day takes a few hours because the camera plays each recording out over the network.
 
 The page listens on `http://127.0.0.1:8787` only. The password is sent to the program on that PC and is not forwarded to any other machine.
 
