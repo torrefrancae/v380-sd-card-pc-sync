@@ -45,7 +45,10 @@ jobs:
         run: choco install innosetup --no-progress -y
 
       - name: Compile the installer
-        run: "& '${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe' installer\V380SdSync.iss"
+        shell: pwsh
+        run: |
+          $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+          & (Join-Path $pf86 'Inno Setup 6\ISCC.exe') installer\V380SdSync.iss
 
       - uses: actions/upload-artifact@v4
         with:
