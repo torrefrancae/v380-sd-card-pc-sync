@@ -7,11 +7,17 @@ const WINDOWS_ZIP = "https://github.com/BtbN/FFmpeg-Builds/releases/download/lat
 
 let pending: Promise<string> | null = null;
 let message = "";
+let readyBin = "";
 
 export function ffmpegStatus(): { ffmpeg: boolean; ffmpegMessage: string } {
   if (pending) return { ffmpeg: false, ffmpegMessage: message };
-  const ready = ffmpegWorks(ffmpegBin());
-  if (ready) message = "";
+  const bin = ffmpegBin();
+  if (readyBin === bin) return { ffmpeg: true, ffmpegMessage: "" };
+  const ready = ffmpegWorks(bin);
+  if (ready) {
+    readyBin = bin;
+    message = "";
+  }
   return { ffmpeg: ready, ffmpegMessage: message };
 }
 
@@ -74,12 +80,11 @@ async function downloadFfmpeg(): Promise<string> {
   const license = findFile(runtime, "LICENSE");
   if (license) fs.copyFileSync(license, path.join(runtime, "FFMPEG-LICENSE.txt"));
   fs.rmSync(zip, { force: true });
-  for (const name of fs.readdirSync(runtime)) {
-    if (name === "ffmpeg.exe" || name === "node.exe" || name === "sql-wasm.wasm" || name === "FFMPEG-LICENSE.txt") continue;
-    fs.rmSync(path.join(runtime, name), { recursive: true, force: true });
-  }
+  const unpacked = extractedRoot(runtime, found);
+  if (unpacked) fs.rmSync(unpacked, { recursive: true, force: true });
   for (let attempt = 0; attempt < 5; attempt += 1) {
     if (ffmpegWorks(dest)) {
+      readyBin = dest;
       message = "";
       return dest;
     }
@@ -102,6 +107,12 @@ function run(command: string, args: string[]): Promise<void> {
       else reject(new Error(error.trim() || `${command} exited ${code}`));
     });
   });
+}
+
+function extractedRoot(runtime: string, file: string): string | null {
+  const rel = path.relative(runtime, path.dirname(file));
+  if (!rel || rel === "." || rel.startsWith("..")) return null;
+  return path.join(runtime, rel.split(path.sep)[0]);
 }
 
 function findFile(dir: string, name: string): string | null {

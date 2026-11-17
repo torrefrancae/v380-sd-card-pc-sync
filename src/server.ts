@@ -117,7 +117,6 @@ async function cameraFrom(body: StartBody): Promise<CameraConfig> {
 
 async function startSync(body: StartBody) {
   if (active) throw new Error("A download is already running");
-  await ensureFfmpeg();
   const config = await cameraFrom(body);
   rememberCamera({
     id: config.deviceId,
@@ -127,6 +126,7 @@ async function startSync(body: StartBody) {
     username: config.username,
     password: config.password,
   });
+  await ensureFfmpeg();
   const date = (body.date ?? "").trim();
   const days = date ? [date] : recentDays(Math.max(1, Math.min(60, Number(body.days || 7))));
   if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Use a date like 2026-11-17");
@@ -321,7 +321,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/sync") {
       await startSync(await readJson(req));
-      send(res, 202, { ok: true });
+      send(res, 202, { ok: true, cameras: savedCameras() });
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/stop") {

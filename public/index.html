@@ -52,7 +52,7 @@
     #settings { background: #fff; color: #1c1915; border: 1px solid #e4d9c8; }
     button:disabled { opacity: 0.55; cursor: default; }
     .cameras { display: flex; flex-direction: column; gap: 8px; }
-    .cameras button { text-align: left; background: #fff; color: #1c1915; border: 1px solid #e3dccf; }
+    .cameras button { display: block; width: 100%; text-align: left; background: #fff; color: #1c1915; border: 1px solid #e3dccf; }
     .cameras button[aria-pressed="true"] { border-color: #c4552a; }
     .empty { margin: 0; color: #6b645b; font-size: 13px; }
     .status { min-height: 1.2em; margin: 10px 0 0; color: #6b4a32; }
@@ -499,6 +499,7 @@
     function cameraButton(camera, label) {
       const button = document.createElement("button");
       button.type = "button";
+      button.camera = camera;
       button.textContent = label;
       button.addEventListener("click", () => selectCamera(camera, button));
       return button;
@@ -517,16 +518,37 @@
       }
     }
 
-    async function loadSaved() {
-      const body = await (await fetch("/api/saved")).json();
+    function renderSaved(cameras) {
       saved.replaceChildren();
-      if (!body.cameras.length) {
-        emptyNote(saved, "No saved cameras yet.");
+      if (!cameras.length) {
+        emptyNote(saved, "No saved cameras yet. Start a download and the camera is listed here.");
         return;
       }
-      for (const camera of body.cameras) {
-        saved.append(cameraButton(camera, camera.name + "   " + camera.host));
+      for (const camera of cameras) {
+        const name = camera.name || ("Camera " + camera.id);
+        const where = camera.host || camera.ip || "";
+        saved.append(cameraButton(camera, name + "   " + where));
       }
+    }
+
+    function showStartedCamera() {
+      const id = Number(form.deviceId.value);
+      const host = form.host.value.trim();
+      if (!id || !host) return;
+      const cameras = [...saved.querySelectorAll("button")].map((button) => button.camera).filter(Boolean);
+      const next = {
+        id,
+        name: form.name.value.trim() || ("Camera " + id),
+        host,
+        username: form.username.value.trim(),
+        hasLogin: Boolean(form.password.value || form.password.placeholder)
+      };
+      renderSaved([...cameras.filter((camera) => camera.id !== id), next]);
+    }
+
+    async function loadSaved() {
+      const body = await (await fetch("/api/saved")).json();
+      renderSaved(body.cameras || []);
     }
 
     find.addEventListener("click", async () => {
@@ -641,9 +663,11 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       setNote("");
+      showStartedCamera();
       setBusy(true, "Saving the camera, then watching for new clips. Older clips follow.");
       try {
-        await post("/api/sync");
+        const started = await post("/api/sync");
+        if (started.cameras) renderSaved(started.cameras);
         showFiles();
         await loadClips();
         const id = Number(form.deviceId.value);
@@ -654,6 +678,8 @@
         form.password.placeholder = "Saved on this PC. Leave blank to keep it.";
       } catch (error) {
         setBusy(false, error.message);
+      } finally {
+        await loadSaved();
       }
     });
 
@@ -736,6 +762,7 @@
       setBusy(true, "Watching for new clips. Older clips follow.");
       setNote("Watching for new clips.");
       showFiles();
+      loadSaved();
       loadClips();
     }).catch(() => undefined);
   </script>
