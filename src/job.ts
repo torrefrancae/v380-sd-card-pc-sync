@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { discover, login, type CameraConfig } from "./session.js";
 import { listRecordings, saveClip, type Segment } from "./recordings.js";
+import { syncRemoved } from "./removed-clips.js";
 
 export type SyncEvent =
   | { type: "log"; message: string }
@@ -124,9 +125,12 @@ export async function runSync(options: {
       opened = await openSession(opened.config);
       continue;
     }
+    const aside = new Set(syncRemoved(options.outDir));
     const onDisk = (start: number) => {
       const output = clipPath(options.outDir, start);
-      return fs.existsSync(output) && fs.statSync(output).size > 4096;
+      if (fs.existsSync(output) && fs.statSync(output).size > 4096) return true;
+      const label = path.relative(options.outDir, output).split(path.sep).join("/");
+      return aside.has(label);
     };
     for (const segment of [...fresh, ...past]) {
       if (!onDisk(segment.start) || counted.has(segment.start)) continue;

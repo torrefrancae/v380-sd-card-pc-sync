@@ -6,9 +6,10 @@ import { appRoot } from "./app-root.js";
 import { ensureFfmpeg, ffmpegStatus } from "./ffmpeg-setup.js";
 import { recentDays, runSync, type SyncEvent } from "./job.js";
 import { discover, login, type CameraConfig } from "./session.js";
-import { cancelPreview, clipInfo, dayFolder, listClips, pipeFile, previewFile, previewStatus, resolveClip } from "./media.js";
+import { cancelPreview, clipInfo, dayFolder, pipeFile, previewFile, previewStatus, resolveClip } from "./media.js";
 import { clearDuty, msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
 import { ensureDefaultKeep, parseKeep, pruneKept, readKeep, writeKeep } from "./keep.js";
+import { listedClips, rememberRemoved, syncRemoved } from "./removed-clips.js";
 import { forgetCamera, rememberCamera, savedCamera, savedCameras, savedIds } from "./saved-cameras.js";
 import { deviceFromV380, readV380Devices } from "./v380-store.js";
 
@@ -168,9 +169,14 @@ function rememberKeep(body: StartBody, outDir: string) {
 
 function sweepOldVideos(): string[] {
   const keep = readKeep();
-  if (!keep) return [];
+  if (!keep) {
+    syncRemoved(path.join(root, "recordings"));
+    return [];
+  }
+  syncRemoved(keep.outDir);
   const deleted = pruneKept(keep, new Date(), activeFile);
   if (deleted.length) {
+    rememberRemoved(keep.outDir, deleted);
     const noun = deleted.length === 1 ? "video" : "videos";
     emit({ type: "log", message: `Removed ${deleted.length} local ${noun} older than ${keep.amount} ${keep.unit}.` });
   }
@@ -231,7 +237,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/clips") {
-      send(res, 200, { clips: listClips(url.searchParams.get("outDir") ?? undefined) });
+      send(res, 200, { clips: listedClips(url.searchParams.get("outDir") ?? undefined) });
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/clip") {
