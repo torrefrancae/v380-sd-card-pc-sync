@@ -13,5 +13,8 @@
     "esbuild": "^0.28.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "sql.js": "^1.16.0"
   }
 }

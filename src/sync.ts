@@ -1,6 +1,6 @@
 import path from "node:path";
-import { execFileSync } from "node:child_process";
-import { appRoot, ffmpegBin } from "./app-root.js";
+import { appRoot } from "./app-root.js";
+import { ensureFfmpeg } from "./ffmpeg-setup.js";
 import { recentDays, runSync } from "./job.js";
 import { cameraConfig, loadEnv } from "./session.js";
 
@@ -17,7 +17,7 @@ async function main() {
     console.log("Copies SD card recordings to recordings/ and skips files already saved.");
     return;
   }
-  execFileSync(ffmpegBin(), ["-version"], { stdio: "ignore" });
+  await ensureFfmpeg();
   const env = loadEnv(path.join(root, ".env"));
   const date = arg("--date");
   const days = date ? [date] : recentDays(Math.max(1, Number(arg("--days") ?? 1)));

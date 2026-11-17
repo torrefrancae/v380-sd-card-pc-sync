@@ -10,15 +10,17 @@ The camera stays on the same network as the PC. Nothing in this project signs in
 
 Download **V380SdSync-Setup.exe** from [Releases](https://github.com/torrefrancae/v380-sd-card-pc-sync/releases).
 
-The installer does not need administrator rights. It places the app in the user profile, adds a Start menu and desktop shortcut, and opens the setup page. Node.js and ffmpeg are inside the installer, so a Windows PC does not need them installed separately.
+The installer does not need administrator rights. It places the app in the user profile, adds a Start menu and desktop shortcut, and opens the setup page. Node.js and ffmpeg are inside the installer. If ffmpeg is missing on a Windows PC, the first open downloads it into the app folder.
 
 Then:
 
-1. Click **Find cameras**.
-2. Select the camera. That fills the IP address and device id.
-3. Enter the camera username and device password from V380 Pro. This is the device login, not the email and password for the V380 account.
+1. Install the V380 app for Windows and sign in with the same account that already has the camera.
+2. Click **Scan V380**. That reads the camera list saved by the V380 app on this PC and fills the device login.
+3. Select the camera. If it is on this network, the current IP is used.
 4. Click **Check login**.
 5. Click **Start download**.
+
+The device login is the camera username and device password stored by the V380 app. It is separate from the account email. If the V380 app has no cameras yet, add the camera there and scan again. **Find on network** still lists cameras that answer on the LAN, and those still need the device login typed in.
 
 Finished clips are written to the save folder. Files that are already there are skipped, so a later run only copies what is new. Each clip is about four minutes. A full day takes a few hours because the camera plays each recording out over the network.
 

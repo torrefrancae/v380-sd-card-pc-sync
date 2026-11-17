@@ -30,6 +30,7 @@ jobs:
           Copy-Item dist/server.mjs build/win/dist/
           Copy-Item public/index.html build/win/public/
           Copy-Item installer/launch.vbs build/win/
+          Copy-Item node_modules/sql.js/dist/sql-wasm.wasm build/win/runtime/
           Copy-Item LICENSE build/win/
           Invoke-WebRequest "https://nodejs.org/dist/v20.20.2/node-v20.20.2-win-x64.zip" -OutFile node.zip
           Expand-Archive node.zip -DestinationPath node-extract

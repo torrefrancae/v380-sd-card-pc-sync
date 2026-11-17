@@ -35,11 +35,12 @@
   <header id="bar"></header>
   <main>
     <h1>V380 SD sync</h1>
-    <p class="lead">Downloads recordings from a V380 camera on this network. Use the camera username and device password from V380 Pro, not the account email.</p>
-    <div id="ffmpeg" class="warn" hidden>ffmpeg is missing. Install it, then reopen this page. On Windows, add ffmpeg to PATH.</div>
+    <p class="lead">Syncs recordings from a V380 camera on this network. Install the V380 app, sign in, then scan. The device login stays in that app.</p>
+    <div id="ffmpeg" class="warn" hidden>Downloading ffmpeg. This happens once.</div>
     <form id="form">
       <div class="actions">
-        <button type="button" id="find" class="secondary">Find cameras</button>
+        <button type="button" id="scan">Scan V380</button>
+        <button type="button" id="find" class="secondary">Find on network</button>
       </div>
       <div id="cameras" class="cameras"></div>
       <div class="row">
@@ -59,7 +60,7 @@
         </div>
         <div>
           <label for="password">Device password</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <input id="password" name="password" type="password" autocomplete="current-password">
         </div>
       </div>
       <div class="row">
@@ -88,6 +89,7 @@
     const status = document.querySelector("#status");
     const log = document.querySelector("#log");
     const cameras = document.querySelector("#cameras");
+    const scan = document.querySelector("#scan");
     const find = document.querySelector("#find");
     const check = document.querySelector("#check");
     const start = document.querySelector("#start");
@@ -98,6 +100,7 @@
     function setBusy(on, text) {
       busy = on;
       bar.classList.toggle("busy", on);
+      scan.disabled = on;
       find.disabled = on;
       check.disabled = on;
       start.disabled = on;
@@ -117,6 +120,7 @@
         deviceId: Number(data.deviceId),
         username: data.username,
         password: data.password,
+        fromApp: form.dataset.fromApp === "1",
         days: Number(data.days || 1),
         date: data.date,
         outDir: data.outDir
@@ -134,6 +138,48 @@
       return body;
     }
 
+    function showCamera(camera, label) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.addEventListener("click", () => {
+        form.host.value = camera.host || camera.ip || "";
+        form.deviceId.value = camera.id;
+        if (camera.username) form.username.value = camera.username;
+        form.password.value = "";
+        form.dataset.fromApp = camera.hasLogin ? "1" : "";
+        for (const item of cameras.querySelectorAll("button")) item.setAttribute("aria-pressed", "false");
+        button.setAttribute("aria-pressed", "true");
+      });
+      cameras.append(button);
+    }
+
+    scan.addEventListener("click", async () => {
+      bar.classList.add("busy");
+      scan.disabled = true;
+      status.textContent = "Reading cameras saved in the V380 app...";
+      cameras.replaceChildren();
+      try {
+        const body = await (await fetch("/api/v380")).json();
+        if (body.error) throw new Error(body.error);
+        if (!body.cameras.length) {
+          status.textContent = "No cameras in the V380 app. Install V380, sign in, add the camera, then scan again.";
+          return;
+        }
+        for (const camera of body.cameras) {
+          const where = camera.onNetwork ? camera.host : "not on this network";
+          const login = camera.hasLogin ? "" : "   type the device password";
+          showCamera(camera, camera.name + "   " + where + "   id " + camera.id + login);
+        }
+        status.textContent = "Select a camera. Its device login comes from the V380 app.";
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        bar.classList.remove("busy");
+        scan.disabled = false;
+      }
+    });
+
     find.addEventListener("click", async () => {
       bar.classList.add("busy");
       find.disabled = true;
@@ -146,16 +192,7 @@
           return;
         }
         for (const camera of body.cameras) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.textContent = camera.ip + "   id " + camera.id + "   " + camera.mac;
-          button.addEventListener("click", () => {
-            form.host.value = camera.ip;
-            form.deviceId.value = camera.id;
-            for (const item of cameras.querySelectorAll("button")) item.setAttribute("aria-pressed", "false");
-            button.setAttribute("aria-pressed", "true");
-          });
-          cameras.append(button);
+          showCamera({ id: camera.id, ip: camera.ip }, camera.ip + "   id " + camera.id + "   " + camera.mac);
         }
         status.textContent = "Select a camera, then enter its username and device password.";
       } catch (error) {
@@ -215,9 +252,23 @@
       if (body.type === "idle" && busy) setBusy(false, status.textContent);
     };
 
-    fetch("/api/status").then((response) => response.json()).then((body) => {
-      document.querySelector("#ffmpeg").hidden = body.ffmpeg;
-    });
+    async function watchFfmpeg() {
+      const box = document.querySelector("#ffmpeg");
+      try {
+        const body = await (await fetch("/api/status")).json();
+        if (body.ffmpeg) {
+          box.hidden = true;
+          return;
+        }
+        box.hidden = false;
+        box.textContent = body.ffmpegMessage || "Downloading ffmpeg. This happens once.";
+      } catch (error) {
+        box.hidden = false;
+        box.textContent = error.message;
+      }
+      setTimeout(watchFfmpeg, 2000);
+    }
+    watchFfmpeg();
   </script>
 </body>
 </html>
