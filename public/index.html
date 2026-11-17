@@ -27,6 +27,9 @@
     .workspace.watching .cols > :not(:first-child),
     .workspace.watching .day-head > :not(:first-child),
     .workspace.watching .file > :not(:first-child) { display: none; }
+    .workspace.watching.live { grid-template-columns: 280px minmax(0, 1fr); }
+    .workspace.watching.live #panel { display: none; }
+    .workspace.watching.live #viewer img { max-height: calc(100vh - 120px); }
     aside, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: 0 12px 32px rgba(26, 29, 33, 0.05); }
     aside { position: sticky; top: 16px; }
     form { margin: 0; }
@@ -320,10 +323,10 @@
       stopPlayer();
       player.hidden = true;
       viewer.hidden = false;
-      workspace.classList.add("watching");
+      workspace.classList.add("watching", "live");
       viewerTitle.textContent = camera.name || ("Camera " + camera.id);
       viewerNote.hidden = false;
-      viewerNote.textContent = "Live";
+      viewerNote.textContent = "Live from the camera. This picture updates as new frames arrive.";
       liveView.hidden = false;
       liveView.src = "/api/live?id=" + encodeURIComponent(camera.id) + "&t=" + Date.now();
       if (showingFiles) renderExplorer();
@@ -337,6 +340,7 @@
 
     function showViewer(file) {
       stopLive();
+      workspace.classList.remove("live");
       player.hidden = false;
       viewingFile = file;
       viewer.hidden = false;
@@ -353,7 +357,7 @@
       stopPlayer();
       stopLive();
       viewer.hidden = true;
-      workspace.classList.remove("watching");
+      workspace.classList.remove("watching", "live");
       fetch("/api/preview/cancel", { method: "POST" }).catch(() => undefined);
       if (showingFiles) renderExplorer();
     }
@@ -471,6 +475,7 @@
     }
 
     function showFiles() {
+      if (workspace.classList.contains("live")) closeViewer();
       showingFiles = true;
       form.hidden = true;
       explorer.hidden = false;
@@ -481,6 +486,7 @@
     }
 
     function showForm() {
+      if (workspace.classList.contains("live")) closeViewer();
       showingFiles = false;
       form.hidden = false;
       explorer.hidden = true;
