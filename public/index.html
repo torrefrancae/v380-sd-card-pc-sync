@@ -93,6 +93,28 @@
     .empty { margin: 0; color: var(--muted); font-size: 13px; }
     .status { min-height: 1.2em; margin: 12px 0 0; color: #7a3b22; font-weight: 600; }
     #viewer video, #viewer img { width: 100%; max-height: 70vh; background: #111; border-radius: 10px; object-fit: contain; }
+    #viewer { position: relative; }
+    #live-layouts { position: relative; display: flex; margin: 0; }
+    #live-layouts[hidden] { display: none; }
+    #live-layout-menu { padding: 8px 12px; }
+    #live-layout-list { display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 6; flex-direction: column; gap: 4px; min-width: 148px; padding: 6px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(26, 29, 33, 0.12); }
+    #live-layouts.open #live-layout-list { display: flex; }
+    #live-layout-list button { width: 100%; text-align: left; border-radius: 8px; padding: 8px 12px; }
+    #live-layout-list button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    .workspace.full #live-layouts { position: absolute; right: 16px; bottom: 16px; left: auto; z-index: 6; }
+    .workspace.full #live-layout-menu { display: none; }
+    .workspace.full #live-layout-list { display: flex; position: static; flex-direction: row; gap: 6px; min-width: 0; padding: 6px; background: rgba(17, 17, 17, 0.72); border: 0; border-radius: 999px; box-shadow: none; }
+    .workspace.full #live-layout-list button { width: auto; }
+    #live-split { display: grid; gap: 8px; width: 100%; height: min(70vh, 520px); min-height: 180px; }
+    #live-split.layout-row { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+    #live-split.layout-stack { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+    #live-split.layout-focus { grid-template-columns: minmax(0, 1fr) minmax(112px, 160px); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+    #live-split.layout-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; }
+    #live-split.layout-pair canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+    #live-split.layout-pair canvas:nth-child(3) { width: min(420px, 36%); justify-self: center; }
+    #live-split canvas { width: 100%; height: 100%; background: #111; border-radius: 10px; display: block; }
+    #live-split.layout-focus canvas { cursor: pointer; }
+    #viewer #live-view.live-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; max-height: none; margin: 0; border-radius: 0; pointer-events: none; }
     #viewer-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .warn, .alert { background: #fff4e8; border: 1px solid #e7c7a4; border-radius: 12px; padding: 10px 12px; }
     .warn { margin-bottom: 14px; }
@@ -118,6 +140,8 @@
     .workspace.full #viewer-title, .workspace.full #viewer-note { color: #fff; }
     .workspace.full #viewer video,
     .workspace.watching.live.full #viewer img { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: contain; }
+    .workspace.watching.live.full #live-view.live-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; flex: none; max-height: none; }
+    .workspace.full #live-split { flex: 1 1 0; height: auto; min-height: 0; }
   </style>
 </head>
 <body>
@@ -247,6 +271,15 @@
         <div class="panel-bar">
           <h2 id="viewer-title">Clip</h2>
           <div class="actions">
+            <div id="live-layouts" hidden>
+              <button type="button" id="live-layout-menu" class="secondary" aria-haspopup="listbox" aria-expanded="false">Horizontal</button>
+              <div id="live-layout-list" role="listbox">
+                <button type="button" class="secondary" data-layout="stack" aria-pressed="false">Vertical</button>
+                <button type="button" class="secondary" data-layout="row" aria-pressed="true">Horizontal</button>
+                <button type="button" class="secondary" data-layout="focus" aria-pressed="false" title="Large view with two small ones on the right. Click a view to swap the large one.">Focus</button>
+                <button type="button" class="secondary" data-layout="pair" aria-pressed="false" title="Two large views with a small one centered below.">Pair</button>
+              </div>
+            </div>
             <button type="button" id="viewer-full" class="secondary">Maximize</button>
             <button type="button" id="viewer-close" class="secondary">Close</button>
           </div>
@@ -254,6 +287,11 @@
         <p id="viewer-note" class="note"></p>
         <video id="player" controls></video>
         <img id="live-view" alt="" hidden>
+        <div id="live-split" class="layout-row" hidden>
+          <canvas></canvas>
+          <canvas></canvas>
+          <canvas></canvas>
+        </div>
       </section>
     </div>
   </main>
@@ -270,6 +308,13 @@
     const viewerFull = document.querySelector("#viewer-full");
     const player = document.querySelector("#player");
     const liveView = document.querySelector("#live-view");
+    const liveSplit = document.querySelector("#live-split");
+    const liveLayouts = document.querySelector("#live-layouts");
+    const liveLayoutMenu = document.querySelector("#live-layout-menu");
+    const livePanes = [...liveSplit.querySelectorAll("canvas")];
+    let livePaint = 0;
+    let liveLayout = "row";
+    let liveFocus = 0;
     const panelTitle = document.querySelector("#panel-title");
     const settings = document.querySelector("#settings");
     const saved = document.querySelector("#saved");
@@ -340,9 +385,89 @@
       player.load();
     }
 
+    function stopLivePaint() {
+      if (livePaint) cancelAnimationFrame(livePaint);
+      livePaint = 0;
+    }
+
+    function paintLive() {
+      const width = liveView.naturalWidth;
+      const height = liveView.naturalHeight;
+      if (width > 0 && height > 2) {
+        const sliceHeight = height / 3;
+        livePanes.forEach((canvas, index) => {
+          const rect = canvas.getBoundingClientRect();
+          const boxWidth = Math.max(1, Math.round(rect.width));
+          const boxHeight = Math.max(1, Math.round(rect.height));
+          if (canvas.width !== boxWidth || canvas.height !== boxHeight) {
+            canvas.width = boxWidth;
+            canvas.height = boxHeight;
+          }
+          if (liveLayout === "pair") canvas.style.aspectRatio = width + " / " + sliceHeight;
+          const scale = Math.min(boxWidth / width, boxHeight / sliceHeight);
+          const drawWidth = width * scale;
+          const drawHeight = sliceHeight * scale;
+          let destY = (boxHeight - drawHeight) / 2;
+          if (liveLayout === "pair" && index < 2) destY = boxHeight - drawHeight;
+          if (liveLayout === "pair" && index === 2) destY = 0;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#111";
+          ctx.fillRect(0, 0, boxWidth, boxHeight);
+          ctx.drawImage(liveView, 0, sliceHeight * index, width, sliceHeight, (boxWidth - drawWidth) / 2, destY, drawWidth, drawHeight);
+        });
+      }
+      livePaint = requestAnimationFrame(paintLive);
+    }
+
+    function startLivePaint() {
+      stopLivePaint();
+      livePaint = requestAnimationFrame(paintLive);
+    }
+
+    function setLiveLayout(name, focus) {
+      const allowed = ["stack", "row", "focus", "pair"];
+      liveLayout = allowed.includes(name) ? name : "row";
+      if (Number.isInteger(focus) && focus >= 0 && focus < livePanes.length) liveFocus = focus;
+      liveSplit.classList.remove("layout-stack", "layout-row", "layout-focus", "layout-pair");
+      liveSplit.classList.add("layout-" + liveLayout);
+      if (liveLayout !== "pair") livePanes.forEach((canvas) => { canvas.style.aspectRatio = ""; });
+      let smallRow = 0;
+      livePanes.forEach((canvas, index) => {
+        canvas.style.gridColumn = "";
+        canvas.style.gridRow = "";
+        canvas.classList.toggle("focus", liveLayout === "focus" && index === liveFocus);
+        if (liveLayout !== "focus" || index === liveFocus) return;
+        smallRow += 1;
+        canvas.style.gridColumn = "2";
+        canvas.style.gridRow = String(smallRow);
+      });
+      if (liveLayout === "focus") {
+        const large = livePanes[liveFocus];
+        large.style.gridColumn = "1";
+        large.style.gridRow = "1 / span 2";
+      }
+      if (liveLayout === "pair") {
+        livePanes[0].style.gridColumn = "1";
+        livePanes[0].style.gridRow = "1";
+        livePanes[1].style.gridColumn = "2";
+        livePanes[1].style.gridRow = "1";
+        livePanes[2].style.gridColumn = "1 / span 2";
+        livePanes[2].style.gridRow = "2";
+      }
+      const layoutNames = { stack: "Vertical", row: "Horizontal", focus: "Focus", pair: "Pair" };
+      liveLayoutMenu.textContent = layoutNames[liveLayout] || "Horizontal";
+      liveLayouts.querySelectorAll("button[data-layout]").forEach((button) => {
+        button.setAttribute("aria-pressed", button.dataset.layout === liveLayout ? "true" : "false");
+      });
+    }
+
     function stopLive() {
+      stopLivePaint();
       liveView.removeAttribute("src");
+      liveView.classList.remove("live-source");
       liveView.hidden = true;
+      liveSplit.hidden = true;
+      liveLayouts.hidden = true;
       fetch("/api/live/stop", { method: "POST" }).catch(() => undefined);
     }
 
@@ -357,9 +482,14 @@
       workspace.classList.add("watching", "live");
       viewerTitle.textContent = camera.name || ("Camera " + camera.id);
       viewerNote.hidden = false;
-      viewerNote.textContent = "Live from the camera. This picture updates as new frames arrive.";
+      viewerNote.textContent = "Live from the camera. Use the layout buttons to arrange the three views.";
+      liveLayouts.hidden = false;
+      setLiveLayout(liveLayout, liveFocus);
+      liveSplit.hidden = false;
       liveView.hidden = false;
+      liveView.classList.add("live-source");
       liveView.src = "/api/live?id=" + encodeURIComponent(camera.id) + "&t=" + Date.now();
+      startLivePaint();
       if (showingFiles) renderExplorer();
       rememberView("live");
     }
@@ -517,6 +647,10 @@
       const id = Number(form.deviceId.value);
       if (id) params.set("camera", String(id));
       if (view === "clip" && viewingFile) params.set("file", viewingFile);
+      if (view === "live") {
+        params.set("layout", liveLayout);
+        if (liveLayout === "focus") params.set("focus", String(liveFocus));
+      }
       if ((view === "live" || view === "clip") && workspace.classList.contains("full")) params.set("full", "1");
       const next = "?" + params.toString();
       if (location.search === next) return;
@@ -528,6 +662,8 @@
       workspace.classList.toggle("full", on);
       document.body.classList.toggle("maximized", on);
       viewerFull.textContent = on ? "Exit maximize" : "Maximize";
+      liveLayouts.classList.remove("open");
+      liveLayoutMenu.setAttribute("aria-expanded", "false");
     }
 
     function savedCameraCard(id) {
@@ -548,7 +684,11 @@
           showFiles();
           await loadClips();
         }
-        if (view === "live" && card) showLive(card.camera);
+        if (view === "live" && card) {
+          const picked = Number(params.get("focus"));
+          showLive(card.camera);
+          setLiveLayout(params.get("layout"), Number.isInteger(picked) ? picked : liveFocus);
+        }
         if (view === "clip" && params.get("file")) await openViewer(params.get("file"));
         if (params.get("full") === "1" && !viewer.hidden) setFull(true);
       } finally {
@@ -1105,6 +1245,33 @@
         setBusy(true, error.message);
         if (showingFiles) renderExplorer();
       }
+    });
+
+    liveLayouts.addEventListener("click", (event) => {
+      if (event.target.closest("#live-layout-menu")) {
+        const open = !liveLayouts.classList.contains("open");
+        liveLayouts.classList.toggle("open", open);
+        liveLayoutMenu.setAttribute("aria-expanded", open ? "true" : "false");
+        return;
+      }
+      const button = event.target.closest("button[data-layout]");
+      if (!button) return;
+      setLiveLayout(button.dataset.layout, liveFocus);
+      liveLayouts.classList.remove("open");
+      liveLayoutMenu.setAttribute("aria-expanded", "false");
+      rememberView("live", true);
+    });
+    document.addEventListener("click", (event) => {
+      if (liveLayouts.contains(event.target)) return;
+      liveLayouts.classList.remove("open");
+      liveLayoutMenu.setAttribute("aria-expanded", "false");
+    });
+    livePanes.forEach((canvas, index) => {
+      canvas.addEventListener("click", () => {
+        if (liveSplit.hidden || liveLayout !== "focus") return;
+        setLiveLayout("focus", index);
+        rememberView("live", true);
+      });
     });
 
     viewerClose.addEventListener("click", () => closeViewer());

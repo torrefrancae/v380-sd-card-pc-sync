@@ -17,7 +17,7 @@ Then:
 1. Click **Find on network**, or **Scan V380** after signing in to the V380 app on this PC.
 2. Select the camera and enter its device username and device password.
 3. Click **Save camera**, or click **Start download**. Starting a download saves the camera on this PC.
-4. The next time, choose it under **Saved cameras**. It no longer appears under Find on network. Cameras found on the network are shown in a highlighted list with a camera icon. Each saved camera has **Settings**, **Files**, and **Live**. Live hides the file list and shows the camera's current picture. That picture is the camera's live stream, not a saved clip, and it updates as new frames arrive. The page address remembers Settings, Files, Live, the open clip, and Maximize, so a refresh keeps the same view. Maximize fills the browser window with the picture and leaves the browser itself visible.
+4. The next time, choose it under **Saved cameras**. It no longer appears under Find on network. Cameras found on the network are shown in a highlighted list with a camera icon. Each saved camera has **Settings**, **Files**, and **Live**. Live hides the file list and shows the camera's current picture. That picture is the camera's live stream, not a saved clip, and it updates as new frames arrive. When the camera sends three views stacked in one picture, Live splits them into three. Vertical stacks them, Horizontal puts them in a row, Focus keeps one large with two small ones on the right, and Pair puts two large ones over a small one centered below. While Focus is selected, click a view to make it the large one. The page address remembers Settings, Files, Live, the layout, the open clip, and Maximize, so a refresh keeps the same view. Maximize fills the browser window with the picture and leaves the browser itself visible. In that enlarged view the layout choices sit at the bottom right. Otherwise they are in a dropdown next to Maximize.
 
 The device login is the camera username and password set in the V380 Android or iOS app: three dots at the top right of the camera, **Settings**, **Password**, **Change device password**. Enter that password twice there so it is not forgotten, then type the same username and password into this program. It is separate from the V380 account email. Saved cameras stay on this PC. The default download is the last 7 days. A date in **Or one date** uses that day only.
 
@@ -52,7 +52,7 @@ flowchart LR
 
 The playback layout was checked against a camera that reports device version 32. Other firmware can differ.
 
-Recorded frames on that version are 1920 by 3240. That is the camera's three views stacked in one picture, not a scaling bug.
+Recorded frames on that version are 1920 by 3240. That is the camera's three views stacked in one picture, not a scaling bug. Live uses the same stack and shows each third on its own.
 
 ## Develop
 
