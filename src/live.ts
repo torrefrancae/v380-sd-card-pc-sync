@@ -73,27 +73,57 @@ async function writeFrames(socket: CameraSocket, key: Buffer, child: ChildProces
   }
 }
 
-function publishJpegs(child: ChildProcess, res: ServerResponse) {
+const SOI = Buffer.from([0xff, 0xd8]);
+const EOI = Buffer.from([0xff, 0xd9]);
+
+/* Keep only the newest pictures. A full browser buffer used to drop a frame halfway and the picture stayed on the last whole one. */
+function publishJpegs(child: ChildProcess, res: ServerResponse, signal: AbortSignal) {
   let pending = Buffer.alloc(0);
+  const queue: Buffer[] = [];
+  let pumping = false;
+  const pump = () => {
+    if (pumping || signal.aborted || res.writableEnded) return;
+    const jpeg = queue.shift();
+    if (!jpeg) return;
+    pumping = true;
+    const packet = Buffer.concat([
+      Buffer.from(`--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpeg.length}\r\n\r\n`),
+      jpeg,
+      Buffer.from("\r\n"),
+    ]);
+    const flushed = res.write(packet);
+    const next = () => {
+      res.off("drain", next);
+      res.off("close", next);
+      pumping = false;
+      if (!signal.aborted && !res.writableEnded) pump();
+    };
+    if (flushed) next();
+    else {
+      res.once("drain", next);
+      res.once("close", next);
+    }
+  };
   child.stdout?.on("data", (chunk: Buffer) => {
     pending = Buffer.concat([pending, chunk]);
-    if (pending.length > 4_000_000) pending = pending.subarray(pending.length - 2_000_000);
+    if (pending.length > 6_000_000) {
+      const at = pending.lastIndexOf(SOI);
+      pending = at >= 0 ? pending.subarray(at) : Buffer.alloc(0);
+    }
     for (;;) {
-      const start = pending.indexOf(Buffer.from([0xff, 0xd8]));
+      const start = pending.indexOf(SOI);
       if (start < 0) {
         pending = Buffer.alloc(0);
         break;
       }
-      const end = pending.indexOf(Buffer.from([0xff, 0xd9]), start + 2);
-      if (end < 0) {
-        pending = pending.subarray(start);
-        break;
-      }
-      const jpeg = pending.subarray(start, end + 2);
+      if (start > 0) pending = pending.subarray(start);
+      const end = pending.indexOf(EOI, 2);
+      if (end < 0) break;
+      queue.push(Buffer.from(pending.subarray(0, end + 2)));
       pending = pending.subarray(end + 2);
-      const header = Buffer.from(`--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpeg.length}\r\n\r\n`);
-      if (!res.write(Buffer.concat([header, jpeg, Buffer.from("\r\n")]))) break;
+      if (queue.length > 2) queue.shift();
     }
+    pump();
   });
 }
 
@@ -105,12 +135,13 @@ export async function streamLive(config: CameraConfig, res: ServerResponse, clos
   stopCurrent = stop;
   close.addEventListener("abort", stop);
   const { socket, key } = await openLive(config);
+  socket.idle(15000);
   const child = spawn(ffmpegBin(), [
     "-hide_banner", "-loglevel", "error",
     "-fflags", "nobuffer", "-flags", "low_delay",
     "-probesize", "32", "-analyzeduration", "0",
     "-f", "hevc", "-i", "pipe:0",
-    "-an", "-vf", "scale=640:-2",
+    "-an", "-vf", "scale=640:-2,fps=8",
     "-q:v", "7",
     "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1",
   ], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
@@ -127,7 +158,7 @@ export async function streamLive(config: CameraConfig, res: ServerResponse, clos
     connection: "close",
   });
   res.flushHeaders();
-  publishJpegs(child, res);
+  publishJpegs(child, res, controller.signal);
   let stopped = false;
   const halt = () => {
     if (stopped) return;

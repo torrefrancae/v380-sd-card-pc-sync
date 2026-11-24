@@ -138,6 +138,10 @@ export class CameraSocket {
     this.socket.removeAllListeners();
     this.socket.destroy();
   }
+
+  idle(ms: number) {
+    this.socket.setTimeout(ms);
+  }
 }
 
 export function openCamera(host: string, port: number, timeoutMs: number): Promise<CameraSocket> {
