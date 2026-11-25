@@ -16,7 +16,7 @@ function stopActive() {
   running.child.kill("SIGKILL");
 }
 
-export function streamPlay(req: IncomingMessage, res: ServerResponse, outDir: string | undefined, file: string) {
+export function streamPlay(req: IncomingMessage, res: ServerResponse, outDir: string | undefined, file: string, startSeconds = 0) {
   const full = resolveClip(outDir, file);
   if (!full || !fs.existsSync(full) || fs.statSync(full).size <= 4096) {
     res.writeHead(404, { "content-type": "application/json; charset=utf-8" });
@@ -30,11 +30,13 @@ export function streamPlay(req: IncomingMessage, res: ServerResponse, outDir: st
     pipeFile(req, res, dest);
     return;
   }
+  const start = Number.isFinite(startSeconds) && startSeconds > 0.2 ? Math.min(startSeconds, 6 * 60 * 60) : 0;
   stopActive();
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const partial = `${dest}.part.mp4`;
   const child = spawn(ffmpegBin(), [
     "-hide_banner", "-loglevel", "error",
+    ...(start ? ["-ss", start.toFixed(3)] : []),
     "-i", full,
     "-an",
     "-vf", "scale=640:-2",
@@ -51,9 +53,9 @@ export function streamPlay(req: IncomingMessage, res: ServerResponse, outDir: st
   const running = { id, child, done: false };
   active = running;
   const hub = new PassThrough();
-  const cache = fs.createWriteStream(partial);
+  const cache = start ? null : fs.createWriteStream(partial);
   child.stdout?.pipe(hub);
-  hub.pipe(cache);
+  if (cache) hub.pipe(cache);
   res.writeHead(200, {
     "content-type": "video/mp4",
     "cache-control": "no-store",
@@ -67,7 +69,7 @@ export function streamPlay(req: IncomingMessage, res: ServerResponse, outDir: st
     if (running.done) return;
     running.done = true;
     if (active === running) active = null;
-    cache.end(() => {
+    cache?.end(() => {
       if (code === 0 && fs.existsSync(partial) && fs.statSync(partial).size > 4096) fs.renameSync(partial, dest);
       else fs.rmSync(partial, { force: true });
     });

@@ -269,7 +269,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/play") {
       await ensureFfmpeg();
-      streamPlay(req, res, url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? "");
+      const start = Number(url.searchParams.get("start"));
+      streamPlay(req, res, url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? "", Number.isFinite(start) ? start : 0);
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/clip") {

@@ -68,6 +68,17 @@
     body.dense h1 { font-size: 18px; margin: 0 0 8px; }
     body.dense .lead { display: none; }
     body.dense .workspace { grid-template-columns: 180px minmax(0, 1fr); gap: 10px; }
+    .workspace.cameras-closed,
+    body.dense .workspace.cameras-closed { grid-template-columns: 52px minmax(0, 1fr); }
+    .workspace.cameras-closed.watching,
+    body.dense .workspace.cameras-closed.watching { grid-template-columns: 52px minmax(160px, 240px) minmax(0, 1fr); }
+    .workspace.cameras-closed.watching.live { grid-template-columns: 52px minmax(0, 1fr); }
+    .aside-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .aside-head h2 { margin: 0; }
+    .workspace.cameras-closed aside { padding: 8px; }
+    .workspace.cameras-closed #camera-body,
+    .workspace.cameras-closed .aside-head h2 { display: none; }
+    .workspace.cameras-closed #cameras-toggle { writing-mode: vertical-rl; transform: rotate(180deg); min-height: 108px; padding: 12px 6px; }
     body.dense .workspace.watching { grid-template-columns: 200px minmax(300px, 460px) minmax(0, 1fr); }
     body.dense aside, body.dense .panel { padding: 10px 12px; }
     body.dense #explorer { max-height: calc(100dvh - 92px); overflow: auto; }
@@ -186,9 +197,15 @@
     .workspace.full #viewer video,
     .workspace.watching.live.full #viewer img { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: contain; background: #111; }
     .workspace.full #player { position: absolute; left: 0; right: 0; top: 56px; bottom: 0; width: 100%; height: auto; max-height: none; object-fit: contain; }
-    .workspace.full.clip-layout #player.clip-source { top: auto; bottom: 0; height: 48px; max-height: 48px; z-index: 5; object-fit: none; object-position: -4000px 0; background: #111; border-radius: 0; }
-    .workspace.full.clip-layout #live-split { position: absolute; left: 8px; right: 8px; top: 56px; bottom: 64px; }
-    .workspace.full.clip-layout #live-layouts { bottom: 64px; }
+    .workspace.full.clip-layout #player.clip-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; max-height: none; }
+    .workspace.full.clip-layout #live-split { position: absolute; left: 8px; right: 8px; top: 56px; bottom: 88px; }
+    .workspace.full.clip-layout #live-layouts { bottom: 18px; }
+    #clip-controls { display: none; }
+    .workspace.full.clip-layout #clip-controls:not([hidden]) { display: flex; position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 7; align-items: center; gap: 10px; width: min(560px, 62%); padding: 8px 12px; border-radius: 999px; background: rgba(17, 17, 17, 0.78); }
+    #clip-play { min-width: 64px; }
+    #clip-at, #clip-end { min-width: 92px; color: #fff; font-size: 12px; font-variant-numeric: tabular-nums; }
+    #clip-end { text-align: right; }
+    #clip-range { flex: 1; min-width: 0; accent-color: #fff; }
     .workspace.watching.live.full #live-view.live-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; flex: none; max-height: none; }
     .workspace.full #live-split { flex: 1 1 0; height: auto; min-height: 0; }
   </style>
@@ -199,17 +216,22 @@
     <h1>V380 SD sync</h1>
     <p class="lead">Copy SD card recordings from a V380 camera on this network onto this PC. Save the camera once. Closing this page leaves the download running.</p>
     <div id="ffmpeg" class="warn" hidden>Downloading ffmpeg. This happens once.</div>
-    <div class="workspace">
+    <div class="workspace cameras-closed">
       <aside>
-        <h2>Saved cameras</h2>
-        <div id="saved" class="cameras"></div>
-        <div class="actions">
-          <button type="button" id="find">Find on network</button>
-          <button type="button" id="scan" class="secondary">Scan V380</button>
+        <div class="aside-head">
+          <h2>Saved cameras</h2>
+          <button type="button" id="cameras-toggle" class="secondary" aria-expanded="false">Cameras</button>
         </div>
-        <div id="found-box">
-          <h2 id="found-title">Not saved yet</h2>
-          <div id="found" class="cameras"></div>
+        <div id="camera-body">
+          <div id="saved" class="cameras"></div>
+          <div class="actions">
+            <button type="button" id="find">Find on network</button>
+            <button type="button" id="scan" class="secondary">Scan V380</button>
+          </div>
+          <div id="found-box">
+            <h2 id="found-title">Not saved yet</h2>
+            <div id="found" class="cameras"></div>
+          </div>
         </div>
       </aside>
       <section class="panel" id="panel">
@@ -352,8 +374,14 @@
           </div>
         </div>
         <p id="viewer-note" class="note"></p>
-        <video id="player" controls></video>
+        <video id="player"></video>
         <img id="live-view" alt="" hidden>
+        <div id="clip-controls" hidden>
+          <button type="button" id="clip-play" class="secondary">Play</button>
+          <span id="clip-at">0:00</span>
+          <input id="clip-range" type="range" min="0" max="0" step="1" value="0" aria-label="Clip time">
+          <span id="clip-end">0:00</span>
+        </div>
         <div id="live-split" class="layout-pair" hidden>
           <canvas></canvas>
           <canvas></canvas>
@@ -368,12 +396,44 @@
     const note = document.querySelector("#note");
     const explorer = document.querySelector("#explorer");
     const workspace = document.querySelector(".workspace");
+    const camerasToggle = document.querySelector("#cameras-toggle");
+    let camerasOpen = false;
+    try {
+      camerasOpen = localStorage.getItem("v380-cameras") === "open";
+    } catch {
+      camerasOpen = false;
+    }
+
+    function applyCameras() {
+      workspace.classList.toggle("cameras-closed", !camerasOpen);
+      camerasToggle.textContent = camerasOpen ? "Hide" : "Cameras";
+      camerasToggle.setAttribute("aria-expanded", camerasOpen ? "true" : "false");
+    }
+
+    applyCameras();
+    camerasToggle.addEventListener("click", () => {
+      camerasOpen = !camerasOpen;
+      try {
+        localStorage.setItem("v380-cameras", camerasOpen ? "open" : "closed");
+      } catch {
+        /* The panel still starts closed next time. */
+      }
+      applyCameras();
+    });
     const viewer = document.querySelector("#viewer");
     const viewerTitle = document.querySelector("#viewer-title");
     const viewerNote = document.querySelector("#viewer-note");
     const viewerClose = document.querySelector("#viewer-close");
     const viewerFull = document.querySelector("#viewer-full");
     const player = document.querySelector("#player");
+    const clipControls = document.querySelector("#clip-controls");
+    const clipPlay = document.querySelector("#clip-play");
+    const clipAt = document.querySelector("#clip-at");
+    const clipEnd = document.querySelector("#clip-end");
+    const clipRange = document.querySelector("#clip-range");
+    let playOffset = 0;
+    let clipDuration = 0;
+    let scrubbing = false;
     const liveView = document.querySelector("#live-view");
     const liveSplit = document.querySelector("#live-split");
     const liveLayouts = document.querySelector("#live-layouts");
@@ -597,7 +657,17 @@
       player.removeAttribute("src");
       player.load();
       player.classList.remove("clip-source");
+      player.controls = false;
       workspace.classList.remove("clip-layout");
+      playOffset = 0;
+      clipDuration = 0;
+      scrubbing = false;
+      clipControls.hidden = true;
+      clipPlay.textContent = "Play";
+      clipAt.textContent = "0:00";
+      clipEnd.textContent = "0:00";
+      clipRange.value = "0";
+      clipRange.max = "0";
     }
 
     function findBytes(buf, a, b, from) {
@@ -825,6 +895,79 @@
       rememberView("live");
     }
 
+    function clipSeconds(file) {
+      const clip = clipFiles.find((item) => item.file.replaceAll("\\", "/") === file);
+      return clip ? Math.max(0, Math.round(Number(clip.seconds) || 0)) : 0;
+    }
+
+    function playStamp(file, seconds) {
+      const match = /^(\d{4})-(\d{2})-(\d{2})\/(\d{2})(\d{2})(\d{2})\.mp4$/.exec(file);
+      const total = Math.max(0, Math.round(seconds));
+      const pad = (value) => String(value).padStart(2, "0");
+      if (!match) {
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        if (hours) return hours + ":" + pad(minutes) + ":" + pad(total % 60);
+        return minutes + ":" + pad(total % 60);
+      }
+      const at = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5], +match[6] + total);
+      const hour = at.getHours();
+      const suffix = hour < 12 ? "AM" : "PM";
+      return (hour % 12 || 12) + ":" + pad(at.getMinutes()) + ":" + pad(at.getSeconds()) + " " + suffix;
+    }
+
+    function knownDuration() {
+      if (clipDuration > 0) return clipDuration;
+      if (Number.isFinite(player.duration) && player.duration > 0) return playOffset + player.duration;
+      return 0;
+    }
+
+    function syncClipControls() {
+      const on = workspace.classList.contains("full") && workspace.classList.contains("clip-layout") && Boolean(viewingFile);
+      clipControls.hidden = !on;
+      player.controls = Boolean(viewingFile) && workspace.classList.contains("clip-layout") && !on;
+    }
+
+    function paintTransport() {
+      if (!viewingFile) return;
+      const duration = knownDuration();
+      const at = playOffset + (Number.isFinite(player.currentTime) ? player.currentTime : 0);
+      if (!scrubbing) {
+        clipRange.max = String(duration || 0);
+        clipRange.value = String(Math.min(duration || at, Math.max(0, at)));
+      }
+      clipAt.textContent = playStamp(viewingFile, scrubbing ? Number(clipRange.value) : at);
+      clipEnd.textContent = duration ? playStamp(viewingFile, duration) : playStamp(viewingFile, 0);
+      clipPlay.textContent = player.paused ? "Play" : "Pause";
+    }
+
+    function canNativeSeek(target) {
+      if (!player.seekable || !player.seekable.length) return false;
+      const local = target - playOffset;
+      return local >= player.seekable.start(0) - 0.2 && local <= player.seekable.end(player.seekable.length - 1) + 0.35;
+    }
+
+    function playUrl(file, start) {
+      const params = new URLSearchParams({ file, outDir: form.outDir.value });
+      if (start > 0.2) params.set("start", start.toFixed(3));
+      return "/api/play?" + params;
+    }
+
+    function seekClip(target) {
+      if (!viewingFile) return;
+      const duration = knownDuration();
+      const at = duration ? Math.min(Math.max(0, target), duration) : Math.max(0, target);
+      if (canNativeSeek(at)) {
+        player.currentTime = Math.max(0, at - playOffset);
+        paintTransport();
+        return;
+      }
+      playOffset = at;
+      player.src = playUrl(viewingFile, at);
+      player.play().catch(() => undefined);
+      paintTransport();
+    }
+
     function showViewer(file) {
       stopLive();
       workspace.classList.remove("live");
@@ -841,6 +984,7 @@
       liveSplit.hidden = false;
       startClipPaint();
       setFull(true);
+      syncClipControls();
       applyBrowse();
       rememberView("clip");
     }
@@ -872,15 +1016,19 @@
       showViewer(file);
       if (removedFiles.has(file)) {
         viewerNote.textContent = deletedAge(file);
+        clipControls.hidden = true;
         if (showingFiles) renderExplorer();
         return;
       }
       viewerNote.textContent = "Opening the clip...";
       if (showingFiles) renderExplorer();
-      const params = new URLSearchParams({ file, outDir: form.outDir.value });
+      clipDuration = clipSeconds(file);
+      playOffset = 0;
+      paintTransport();
       const hide = () => {
         if (token !== playToken) return;
         viewerNote.hidden = true;
+        paintTransport();
       };
       player.addEventListener("loadeddata", hide, { once: true });
       player.addEventListener("error", () => {
@@ -888,7 +1036,7 @@
         viewerNote.hidden = false;
         viewerNote.textContent = "Could not open the clip.";
       }, { once: true });
-      player.src = "/api/play?" + params;
+      player.src = playUrl(file, 0);
       player.play().catch(() => undefined);
       abort.signal.addEventListener("abort", () => stopPlayer(), { once: true });
     }
@@ -971,6 +1119,7 @@
       viewerFull.textContent = on ? "Exit maximize" : "Maximize";
       liveLayouts.classList.remove("open");
       liveLayoutMenu.setAttribute("aria-expanded", "false");
+      syncClipControls();
       if (!workspace.classList.contains("live") || !liveCamera) return;
       viewerNote.textContent = "Live from the camera. Use the layout buttons to arrange the three views.";
       if (!document.hidden && !liveStream) startLiveStream();
@@ -1685,6 +1834,24 @@
       if (!liveStream) startLiveStream();
     });
 
+    clipPlay.addEventListener("click", () => {
+      if (!viewingFile) return;
+      if (player.paused) player.play().catch(() => undefined);
+      else player.pause();
+      paintTransport();
+    });
+    clipRange.addEventListener("input", () => {
+      scrubbing = true;
+      clipAt.textContent = playStamp(viewingFile, Number(clipRange.value));
+    });
+    clipRange.addEventListener("change", () => {
+      scrubbing = false;
+      seekClip(Number(clipRange.value));
+    });
+    player.addEventListener("timeupdate", paintTransport);
+    player.addEventListener("play", paintTransport);
+    player.addEventListener("pause", paintTransport);
+    player.addEventListener("loadedmetadata", paintTransport);
     viewerClose.addEventListener("click", () => closeViewer());
     viewerFull.addEventListener("click", () => {
       const on = !workspace.classList.contains("full");
