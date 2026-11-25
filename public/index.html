@@ -161,10 +161,10 @@
     #live-layouts.open #live-layout-list { display: flex; }
     #live-layout-list button { width: 100%; text-align: left; border-radius: 8px; padding: 8px 12px; }
     #live-layout-list button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-    .workspace.full #live-layouts { position: absolute; right: 16px; bottom: 16px; left: auto; z-index: 6; }
+    .workspace.full #live-layouts { position: static; margin-right: auto; pointer-events: auto; z-index: 6; }
     .workspace.full #live-layout-menu { display: none; }
     .workspace.full #live-layout-list { display: flex; position: static; flex-direction: row; gap: 6px; min-width: 0; padding: 6px; background: rgba(17, 17, 17, 0.72); border: 0; border-radius: 999px; box-shadow: none; }
-    .workspace.full #live-layout-list button { width: auto; }
+    .workspace.full #live-layout-list button { width: auto; padding: 8px 12px; }
     #live-split { display: grid; gap: 8px; width: 100%; height: min(70vh, 520px); min-height: 180px; }
     #live-split.layout-row { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
     #live-split.layout-stack { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); }
@@ -172,6 +172,8 @@
     #live-split.layout-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; }
     #live-split.layout-pair canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; }
     #live-split.layout-pair canvas:nth-child(3) { width: min(420px, 36%); justify-self: center; }
+    #live-split.layout-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+    #live-split.layout-grid canvas:nth-child(3) { grid-column: 1 / span 2; width: calc(50% - 4px); justify-self: center; }
     #live-split canvas { width: 100%; height: 100%; background: #111; border-radius: 10px; display: block; }
     #live-split.layout-focus canvas { cursor: pointer; }
     #viewer #live-view.live-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; max-height: none; margin: 0; border-radius: 0; pointer-events: none; }
@@ -192,19 +194,25 @@
       .reveal { padding: 4px 8px; }
     }
     body.maximized { overflow: hidden; }
+    body.maximized main { max-width: none; height: calc(100dvh - 3px); margin: 0; padding: 10px 12px 12px; display: flex; flex-direction: column; box-sizing: border-box; }
+    body.maximized .lead, body.maximized #ffmpeg { display: none; }
+    body.maximized .page-head { flex: none; margin: 0 0 8px; }
     .workspace.full,
-    .workspace.watching.live.full { position: fixed; inset: 0; z-index: 30; width: 100%; height: 100dvh; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; gap: 0; margin: 0; padding: 0; background: #111; }
+    .workspace.watching.live.full { position: relative; z-index: 1; flex: 1 1 0; width: 100%; min-height: 0; height: auto; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; gap: 0; margin: 0; padding: 0; background: #111; border-radius: 16px; overflow: hidden; }
     .workspace.full aside, .workspace.full #panel { display: none; }
-    .workspace.full #viewer { position: absolute; inset: 0; height: auto; min-height: 0; margin: 0; padding: 8px 10px; background: #111; color: #fff; border: 0; border-radius: 0; box-shadow: none; display: flex; flex-direction: column; }
-    .workspace.full #viewer .panel-bar { flex: none; }
+    .workspace.full #viewer { position: absolute; inset: 0; height: auto; min-height: 0; margin: 0; padding: 0; background: #111; color: #fff; border: 0; border-radius: 0; box-shadow: none; display: flex; flex-direction: column; }
+    .workspace.full #viewer .panel-bar { position: absolute; left: 12px; right: 12px; bottom: 12px; top: auto; z-index: 6; display: flex; margin: 0; padding: 0; background: none; pointer-events: none; }
+    .workspace.full #viewer-title { display: none; }
+    .workspace.full #viewer .panel-bar .actions { display: flex; width: 100%; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; pointer-events: none; }
+    .workspace.full #viewer-full { order: 2; pointer-events: auto; }
+    .workspace.full #viewer-close { order: 1; pointer-events: auto; }
     .workspace.full #viewer-note { display: none; }
     .workspace.full #viewer-title, .workspace.full #viewer-note { color: #fff; }
     .workspace.full #viewer video,
     .workspace.watching.live.full #viewer img { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: contain; background: #111; }
     .workspace.full #player { position: absolute; left: 0; right: 0; top: 56px; bottom: 0; width: 100%; height: auto; max-height: none; object-fit: contain; }
     .workspace.full.clip-layout #player.clip-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; max-height: none; }
-    .workspace.full.clip-layout #live-split { position: absolute; left: 8px; right: 8px; top: 56px; bottom: 88px; }
-    .workspace.full.clip-layout #live-layouts { bottom: 18px; }
+    .workspace.full.clip-layout #live-split { bottom: 72px; }
     #clip-controls { display: none; }
     .workspace.full.clip-layout #clip-controls:not([hidden]) { display: flex; position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 7; align-items: center; gap: 10px; width: min(560px, 62%); padding: 8px 12px; border-radius: 999px; background: rgba(17, 17, 17, 0.78); }
     #clip-play { min-width: 64px; }
@@ -212,7 +220,7 @@
     #clip-end { text-align: right; }
     #clip-range { flex: 1; min-width: 0; accent-color: #fff; }
     .workspace.watching.live.full #live-view.live-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; flex: none; max-height: none; }
-    .workspace.full #live-split { flex: 1 1 0; height: auto; min-height: 0; }
+    .workspace.full #live-split { position: absolute; left: 8px; right: 8px; top: 8px; bottom: 64px; height: auto; min-height: 0; }
     #viewer { position: relative; }
     #real-clock { position: absolute; top: 14px; right: 14px; z-index: 8; padding: 6px 12px; border-radius: 999px; background: rgba(17, 17, 17, 0.78); color: #fff; font-size: 14px; font-variant-numeric: tabular-nums; }
     .workspace.full #real-clock { top: 16px; right: 16px; }
@@ -380,6 +388,7 @@
                 <button type="button" class="secondary" data-layout="row" aria-pressed="false">Horizontal</button>
                 <button type="button" class="secondary" data-layout="focus" aria-pressed="false" title="Large view with two small ones on the right. Click a view to swap the large one.">Focus</button>
                 <button type="button" class="secondary" data-layout="pair" aria-pressed="true" title="Two large views with a small one centered below.">Pair</button>
+                <button type="button" class="secondary" data-layout="grid" aria-pressed="false" title="Each view the same size, two across and the third centered below.">Grid</button>
               </div>
             </div>
             <button type="button" id="viewer-full" class="secondary">Maximize</button>
@@ -460,7 +469,7 @@
     let liveFrame = null;
     let liveCamera = null;
     const layoutKey = "v380-layout";
-    const layoutNames = ["stack", "row", "focus", "pair"];
+    const layoutNames = ["stack", "row", "focus", "pair", "grid"];
 
     function readStoredLayout() {
       try {
@@ -828,10 +837,10 @@
     }
 
     function setLiveLayout(name, focus) {
-      const allowed = ["stack", "row", "focus", "pair"];
+      const allowed = ["stack", "row", "focus", "pair", "grid"];
       liveLayout = allowed.includes(name) ? name : "pair";
       if (Number.isInteger(focus) && focus >= 0 && focus < livePanes.length) liveFocus = focus;
-      liveSplit.classList.remove("layout-stack", "layout-row", "layout-focus", "layout-pair");
+      liveSplit.classList.remove("layout-stack", "layout-row", "layout-focus", "layout-pair", "layout-grid");
       liveSplit.classList.add("layout-" + liveLayout);
       if (liveLayout !== "pair") livePanes.forEach((canvas) => { canvas.style.aspectRatio = ""; });
       let smallRow = 0;
@@ -857,7 +866,7 @@
         livePanes[2].style.gridColumn = "1 / span 2";
         livePanes[2].style.gridRow = "2";
       }
-      const layoutLabels = { stack: "Vertical", row: "Horizontal", focus: "Focus", pair: "Pair" };
+      const layoutLabels = { stack: "Vertical", row: "Horizontal", focus: "Focus", pair: "Pair", grid: "Grid" };
       liveLayoutMenu.textContent = layoutLabels[liveLayout] || "Pair";
       try {
         localStorage.setItem(layoutKey, JSON.stringify({ layout: liveLayout, focus: liveFocus }));
@@ -908,6 +917,7 @@
       if (showingFiles) renderExplorer();
       applyBrowse();
       syncCameraTools();
+      setFull(true);
       paintRealClock();
       rememberView("live");
     }
