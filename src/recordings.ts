@@ -146,13 +146,27 @@ export async function downloadSegment(config: CameraConfig, ticket: number, segm
     let lastPacket = 0;
     let lastFrame = 0;
     let sinceAck = 0;
+    let quiet = 0;
     for (;;) {
-      const header = await socket.read(8);
+      let header: Buffer;
+      try {
+        header = await socket.read(8, 5000);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message !== "camera went quiet") throw error;
+        /* The camera often sends the whole clip and then never sends the end mark. Ack once, then keep the file. */
+        await sendPlayback(socket, 2, segment, note, lastFrame, lastPacket);
+        quiet += 1;
+        if (written > 0 && pending.length < 22 && quiet >= 2) break;
+        if (quiet >= 6) throw new Error("camera stopped sending this clip");
+        continue;
+      }
+      quiet = 0;
       const type = header[0];
       note = header[1];
       const packet = header.readUInt16LE(2);
       const size = header.readUInt16LE(4);
-      const payload = size ? await socket.read(size) : Buffer.alloc(0);
+      const payload = size ? await socket.read(size, 5000) : Buffer.alloc(0);
       if (type === 0xef) break;
       if (type === 0x1f) continue;
       if (type === 0x6f) {
@@ -180,7 +194,7 @@ export async function downloadSegment(config: CameraConfig, ticket: number, segm
         written += annex.length;
         onBytes(written);
       }
-      if (sinceAck >= 200) {
+      if (sinceAck >= 40) {
         await sendPlayback(socket, 2, segment, note, lastFrame, lastPacket);
         sinceAck = 0;
       }

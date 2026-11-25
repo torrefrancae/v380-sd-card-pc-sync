@@ -11,6 +11,7 @@ import { msUntilThreeAm, readDuty, writeDuty } from "./duty.js";
 import { ensureDefaultKeep, parseKeep, pruneKept, readKeep, writeKeep } from "./keep.js";
 import { listedClips, rememberRemoved, syncRemoved } from "./removed-clips.js";
 import { stopLive, streamLive } from "./live.js";
+import { ensureThumb } from "./thumb.js";
 import { forgetCamera, rememberCamera, savedCamera, savedCameras, savedIds } from "./saved-cameras.js";
 import { deviceFromV380, readV380Devices } from "./v380-store.js";
 
@@ -297,6 +298,21 @@ const server = http.createServer(async (req, res) => {
       pipeFile(req, res, clip);
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/thumb") {
+      await ensureFfmpeg();
+      const thumb = await ensureThumb(url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? "");
+      if (!thumb) {
+        send(res, 404, { error: "No preview yet" });
+        return;
+      }
+      res.writeHead(200, {
+        "content-type": "image/jpeg",
+        "content-length": fs.statSync(thumb).size,
+        "cache-control": "private, max-age=86400",
+      });
+      fs.createReadStream(thumb).pipe(res);
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/api/status") {
       send(res, 200, { ...ffmpegStatus(), running: active !== null, paused: paused || Boolean(readDuty()?.paused), activeFile, activeBytes, activePercent });
       return;
@@ -451,10 +467,9 @@ server.listen(port, "127.0.0.1", () => {
   opener.unref();
 });
 
-function prunePreviews() {
-  const dir = path.join(root, "runtime", "previews");
+function pruneOld(dir: string, days: number) {
   if (!fs.existsSync(dir)) return;
-  const cutoff = Date.now() - 3 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   for (const name of fs.readdirSync(dir)) {
     const full = path.join(dir, name);
     try {
@@ -463,4 +478,9 @@ function prunePreviews() {
       /* A preview can be open while it is pruned. */
     }
   }
+}
+
+function prunePreviews() {
+  pruneOld(path.join(root, "runtime", "previews"), 3);
+  pruneOld(path.join(root, "runtime", "thumbs"), 14);
 }

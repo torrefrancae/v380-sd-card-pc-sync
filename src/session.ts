@@ -110,10 +110,31 @@ export class CameraSocket {
     pending.resolve(Buffer.from(out));
   }
 
-  read(n: number): Promise<Buffer> {
+  read(n: number, timeoutMs = 0): Promise<Buffer> {
     if (this.dead) return Promise.reject(this.dead);
     return new Promise((resolve, reject) => {
-      this.wait = { n, resolve, reject };
+      let settled = false;
+      const waiter = {
+        n,
+        resolve: (buf: Buffer) => {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          resolve(buf);
+        },
+        reject: (err: Error) => {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          reject(err);
+        },
+      };
+      const timer = timeoutMs > 0 ? setTimeout(() => {
+        if (settled || this.wait !== waiter) return;
+        this.wait = null;
+        waiter.reject(new Error("camera went quiet"));
+      }, timeoutMs) : undefined;
+      this.wait = waiter;
       this.pump();
     });
   }

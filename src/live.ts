@@ -134,9 +134,30 @@ export async function streamLive(config: CameraConfig, res: ServerResponse, clos
   const stop = () => controller.abort();
   stopCurrent = stop;
   close.addEventListener("abort", stop);
-  const { socket, key } = await openLive(config);
+  let socket: CameraSocket | null = null;
+  let child: ChildProcess | null = null;
+  let stopped = false;
+  const halt = () => {
+    if (stopped) return;
+    stopped = true;
+    socket?.close();
+    if (child && child.exitCode === null) child.kill("SIGKILL");
+    if (!res.writableEnded) res.end();
+  };
+  controller.signal.addEventListener("abort", halt);
+  if (controller.signal.aborted) {
+    halt();
+    return;
+  }
+  const opened = await openLive(config);
+  socket = opened.socket;
+  const key = opened.key;
+  if (controller.signal.aborted) {
+    halt();
+    return;
+  }
   socket.idle(15000);
-  const child = spawn(ffmpegBin(), [
+  child = spawn(ffmpegBin(), [
     "-hide_banner", "-loglevel", "error",
     "-fflags", "nobuffer", "-flags", "low_delay",
     "-probesize", "32", "-analyzeduration", "0",
@@ -159,19 +180,6 @@ export async function streamLive(config: CameraConfig, res: ServerResponse, clos
   });
   res.flushHeaders();
   publishJpegs(child, res, controller.signal);
-  let stopped = false;
-  const halt = () => {
-    if (stopped) return;
-    stopped = true;
-    socket.close();
-    child.kill();
-    if (!res.writableEnded) res.end();
-  };
-  if (controller.signal.aborted) {
-    halt();
-    return;
-  }
-  controller.signal.addEventListener("abort", halt);
   child.on("close", halt);
   try {
     await writeFrames(socket, key, child, controller.signal);

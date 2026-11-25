@@ -16,7 +16,7 @@
     h1 { font-size: 30px; font-weight: 680; letter-spacing: -0.03em; margin: 0 0 6px; }
     h2 { font-size: 15px; margin: 0 0 8px; }
     p.lead { margin: 0 0 22px; max-width: 68ch; color: var(--muted); }
-    .workspace { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 18px; align-items: start; }
+    .workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px; align-items: start; }
     .workspace.watching { grid-template-columns: 280px minmax(160px, 240px) minmax(0, 1fr); }
     .workspace.watching .cols,
     .workspace.watching .day-head,
@@ -34,13 +34,18 @@
     aside, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: 0 12px 32px rgba(26, 29, 33, 0.05); }
     aside { position: sticky; top: 16px; }
     form { margin: 0; }
-    .panel-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .panel-bar { display: flex; justify-content: flex-start; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .panel-bar .actions { margin-left: auto; }
     .panel-bar h2 { margin: 0; }
     .panel-bar .actions { margin-top: 0; }
-    .cols, .day-head, .file { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(120px, 0.8fr) 88px minmax(168px, 1fr) 120px; gap: 8px; align-items: center; }
+    .cols, .day-head, .file { display: grid; grid-template-columns: 148px minmax(120px, 0.8fr) 88px minmax(168px, 1fr) 120px; gap: 8px; align-items: center; }
     .cols { padding: 0 8px 8px; border-bottom: 1px solid #efeae1; color: #6b645b; font-size: 12px; }
     button.text { background: none; color: inherit; border-radius: 0; padding: 0; font: inherit; text-align: left; }
     .day { margin-top: 4px; }
+    .hour { margin: 6px 0 6px 40px; padding: 8px 8px 10px; border-radius: 10px; background: #e7eef6; }
+    .hour-alt { background: #f6efe6; }
+    .hour-head { margin: 0 0 6px; color: #3d4650; font-size: 13px; font-weight: 650; }
+    .hour .file { padding-left: 0; }
     .day-head { font-weight: 650; padding: 7px 8px; border-radius: 8px; }
     .day-head:hover { background: #f7f1e7; }
     .fold { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -51,6 +56,38 @@
     .file:hover, .file.playing { background: #f7f1e7; }
     .file.playing { background: #fff4e8; }
     .file button.text { color: #9a3412; }
+    .file button.thumb { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; color: inherit; }
+    .shot, .shot-empty { width: 128px; height: 72px; object-fit: cover; border-radius: 8px; background: #1a1d21; display: block; }
+    .shot-time { font-size: 12px; color: #5c564c; font-variant-numeric: tabular-nums; }
+    .workspace.watching .shot, .workspace.watching .shot-empty { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+    .browse { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+    .browse button { padding: 6px 10px; font-size: 13px; }
+    .browse button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    body.dense main { max-width: none; padding: 10px 12px 16px; }
+    body.dense h1 { font-size: 18px; margin: 0 0 8px; }
+    body.dense .lead { display: none; }
+    body.dense .workspace { grid-template-columns: 180px minmax(0, 1fr); gap: 10px; }
+    body.dense .workspace.watching { grid-template-columns: 200px minmax(300px, 460px) minmax(0, 1fr); }
+    body.dense aside, body.dense .panel { padding: 10px 12px; }
+    body.dense #explorer { max-height: calc(100dvh - 92px); overflow: auto; }
+    #explorer.icons .cols { display: none; }
+    #explorer.icons .day-head { display: flex; align-items: center; gap: 8px; padding: 2px 0 4px; }
+    #explorer.icons .day-head .when,
+    #explorer.icons .day-head .remark,
+    #explorer.icons .day-head .progress { display: none; }
+    #panel, #explorer, #explorer .day, #explorer.icons .hour { min-width: 0; }
+    #explorer.icons .hour { margin-left: 36px; }
+    #explorer.icons .hour-head { font-size: 12px; }
+    #explorer.icons .tiles { display: flex; flex-wrap: nowrap; gap: 6px; margin: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding-bottom: 4px; }
+    #explorer.icons .tiles::-webkit-scrollbar { height: 8px; }
+    #explorer.icons .tiles::-webkit-scrollbar-thumb { background: #c5ced6; border-radius: 99px; }
+    #explorer.icons .file { display: block; flex: 0 0 132px; width: 132px; margin: 0; padding: 0; background: none; }
+    #explorer.icons .file button.thumb { position: relative; width: 100%; }
+    #explorer.icons .shot, #explorer.icons .shot-empty { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 6px; }
+    #explorer.icons .shot-time { position: absolute; left: 4px; bottom: 4px; padding: 0 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.62); color: #fff; font-size: 11px; line-height: 1.5; }
+    #explorer.icons .shot-badge { position: absolute; right: 4px; top: 4px; padding: 0 4px; border-radius: 4px; background: rgba(184, 67, 31, 0.92); color: #fff; font-size: 11px; }
+    #explorer.icons .file.playing .shot, #explorer.icons .file.playing .shot-empty { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .workspace.watching:has(#explorer.icons) .file > :not(:first-child) { display: block; }
     .file.removed button.text, .file.removed .when { color: #8a8175; text-decoration: line-through; text-decoration-thickness: 1.5px; }
     .when { color: #5c564c; font-variant-numeric: tabular-nums; }
     .progress { display: flex; align-items: center; gap: 6px; color: #5c564c; font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -78,15 +115,18 @@
     button { border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-weight: 650; cursor: pointer; background: #1a1d21; color: #fff; }
     button.secondary { background: #e8edf2; color: #1a1d21; }
     #start, #applyKeep, #pause.play { background: var(--accent); color: #fff; }
-    #settings { background: #fff; color: #1a1d21; border: 1px solid var(--line); }
+    .panel-bar .camera-actions { margin: 0; }
+    .panel-bar .camera-actions button { flex-direction: row; gap: 4px; padding: 6px 10px; border-radius: 999px; }
+    .panel-bar .camera-actions button[aria-pressed="true"] { background: #1a1d21; color: #fff; }
+    .panel-bar .camera-actions button.live[aria-pressed="true"] { background: var(--accent); color: #fff; }
     button:disabled { opacity: 0.55; cursor: default; }
     .cameras { display: flex; flex-direction: column; gap: 8px; }
     .cameras > button { display: block; width: 100%; text-align: left; background: #fff; color: #1a1d21; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 500; line-height: 1.35; }
     .cameras > button[aria-pressed="true"] { border-color: var(--accent); background: #fff7f2; box-shadow: inset 3px 0 0 var(--accent); }
-    .camera-card { border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 12px; }
+    .camera-card { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 8px 10px; }
     .camera-card[aria-pressed="true"] { border-color: var(--accent); background: #fff7f2; box-shadow: inset 3px 0 0 var(--accent); }
     .camera-pick { display: block; width: 100%; text-align: left; background: none; color: inherit; border: 0; border-radius: 8px; padding: 0; font-weight: 680; }
-    .camera-where { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+    .camera-where { margin: 2px 0 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .camera-actions { display: flex; gap: 6px; margin-top: 10px; }
     .camera-actions button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 10px; padding: 8px 4px; background: #e8edf2; color: #1a1d21; font-size: 12px; font-weight: 650; }
     .camera-actions button svg { width: 16px; height: 16px; }
@@ -128,7 +168,8 @@
     .found-where { color: var(--muted); font-size: 13px; }
     @media (max-width: 1100px) {
       .workspace, .workspace.watching, .row { grid-template-columns: 1fr; }
-      .cols, .day-head, .file { grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) 56px minmax(0, 0.9fr) 72px; }
+      .cols, .day-head, .file { grid-template-columns: 112px minmax(0, 0.7fr) 56px minmax(0, 0.9fr) 72px; }
+      .shot, .shot-empty { width: 96px; height: 54px; }
       .reveal { padding: 4px 8px; }
     }
     body.maximized { overflow: hidden; }
@@ -166,10 +207,19 @@
       </aside>
       <section class="panel" id="panel">
         <div class="panel-bar">
+          <div id="camera-tools" class="camera-actions">
+            <button type="button" id="tool-settings" disabled>Settings</button>
+            <button type="button" id="tool-files" disabled>Files</button>
+            <button type="button" id="tool-live" class="live" disabled>Live</button>
+          </div>
           <h2 id="panel-title">Setup</h2>
           <div class="actions">
+            <div id="browse" class="browse" hidden>
+              <button type="button" id="browse-icons" class="secondary" aria-pressed="true">Icons</button>
+              <button type="button" id="browse-list" class="secondary" aria-pressed="false">List</button>
+              <button type="button" id="browse-sort" class="secondary">Newest</button>
+            </div>
             <button type="button" id="pause" class="secondary" hidden>Pause</button>
-            <button type="button" id="settings" class="secondary" hidden>Settings</button>
           </div>
         </div>
       <form id="form">
@@ -320,7 +370,9 @@
     let liveLayout = "row";
     let liveFocus = 0;
     const panelTitle = document.querySelector("#panel-title");
-    const settings = document.querySelector("#settings");
+    const toolSettings = document.querySelector("#tool-settings");
+    const toolFiles = document.querySelector("#tool-files");
+    const toolLive = document.querySelector("#tool-live");
     const saved = document.querySelector("#saved");
     const found = document.querySelector("#found");
     const scan = document.querySelector("#scan");
@@ -340,8 +392,22 @@
     let activePercent = null;
     let showingFiles = false;
     let recentFirst = true;
+    let browse = "icons";
     const openDays = new Set();
     const closedDays = new Set();
+    const iconClosed = new Set();
+    const browseBar = document.querySelector("#browse");
+    const browseIcons = document.querySelector("#browse-icons");
+    const browseList = document.querySelector("#browse-list");
+    const browseSort = document.querySelector("#browse-sort");
+    const thumbObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const img = entry.target;
+        if (img.dataset.src && !img.getAttribute("src")) img.src = img.dataset.src;
+        thumbObserver.unobserve(img);
+      }
+    }, { rootMargin: "240px" });
     const remarks = new Map();
     let keepLoaded = false;
     let viewingFile = "";
@@ -374,11 +440,76 @@
       pause.classList.toggle("play", paused && !busy);
     }
 
-    function clipButton(file) {
+    function clipTime(file) {
+      const name = file.slice(file.indexOf("/") + 1, file.lastIndexOf("."));
+      if (!/^\d{6}$/.test(name)) return "";
+      return name.slice(0, 2) + ":" + name.slice(2, 4) + ":" + name.slice(4, 6);
+    }
+
+    function clipRow(file, savedNames, current) {
+      const row = document.createElement("div");
+      const gone = removedFiles.has(file);
+      const onDisk = savedNames.has(file);
+      const live = file === current && !onDisk && !gone;
+      row.className = "file" + (file === viewingFile ? " playing" : "") + (gone ? " removed" : "");
+      row.dataset.file = file;
+      const name = document.createElement("div");
+      name.className = "fold";
+      if (live) {
+        const spin = document.createElement("span");
+        spin.className = "spin";
+        name.append(spin);
+      }
+      name.append(clipButton(file, onDisk, live));
+      const whenCell = document.createElement("span");
+      whenCell.className = "when";
+      whenCell.textContent = clockLabel(file);
+      const remark = document.createElement("span");
+      remark.className = "remark";
+      remark.textContent = remarkText(file, live);
+      const progress = onDisk || live ? progressCell(live ? livePercent() : 100, live) : document.createElement("span");
+      row.append(name, whenCell, progress, remark, document.createElement("span"));
+      return row;
+    }
+
+    function clipTile(file, savedNames, current) {
+      const gone = removedFiles.has(file);
+      const onDisk = savedNames.has(file);
+      const live = file === current && !onDisk && !gone;
+      const tile = document.createElement("div");
+      tile.className = "file" + (file === viewingFile ? " playing" : "") + (gone ? " removed" : "");
+      tile.dataset.file = file;
+      tile.append(clipButton(file, onDisk, live));
+      return tile;
+    }
+
+    function clipButton(file, ready, live) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "text";
-      button.textContent = file.slice(file.indexOf("/") + 1);
+      button.className = "text thumb";
+      button.setAttribute("aria-label", clockLabel(file));
+      if (ready) {
+        const img = document.createElement("img");
+        img.className = "shot";
+        img.alt = "";
+        img.dataset.src = "/api/thumb?" + new URLSearchParams({ file, outDir: form.outDir.value });
+        button.append(img);
+        thumbObserver.observe(img);
+      } else {
+        const blank = document.createElement("span");
+        blank.className = "shot-empty";
+        button.append(blank);
+      }
+      const time = document.createElement("span");
+      time.className = "shot-time";
+      time.textContent = clipTime(file);
+      button.append(time);
+      if (live) {
+        const badge = document.createElement("span");
+        badge.className = "shot-badge";
+        badge.textContent = livePercent() + "%";
+        button.append(badge);
+      }
       button.addEventListener("click", () => openViewer(file));
       return button;
     }
@@ -497,7 +628,7 @@
     }
 
     function liveWatching() {
-      return Boolean(liveCamera) && workspace.classList.contains("live") && workspace.classList.contains("full") && !document.hidden;
+      return Boolean(liveCamera) && workspace.classList.contains("live") && !document.hidden;
     }
 
     function startLiveStream() {
@@ -597,10 +728,12 @@
         viewerNote.textContent = "Live from the camera. Use the layout buttons to arrange the three views.";
         startLiveStream();
       } else {
-        viewerNote.textContent = "Maximize to watch the live picture.";
+        viewerNote.textContent = "The live picture starts when this window is visible.";
         stopLiveStream();
       }
       if (showingFiles) renderExplorer();
+      applyBrowse();
+      syncCameraTools();
       rememberView("live");
     }
 
@@ -619,6 +752,7 @@
       workspace.classList.add("watching");
       viewerTitle.textContent = file;
       viewerNote.hidden = false;
+      applyBrowse();
       rememberView("clip");
     }
 
@@ -634,6 +768,8 @@
       document.body.classList.remove("maximized");
       viewerFull.textContent = "Maximize";
       fetch("/api/preview/cancel", { method: "POST" }).catch(() => undefined);
+      applyBrowse();
+      syncCameraTools();
       if (showingFiles) renderExplorer();
       if (!keepUrl) rememberView(showingFiles ? "files" : "settings");
     }
@@ -762,6 +898,7 @@
         if (liveLayout === "focus") params.set("focus", String(liveFocus));
       }
       if ((view === "live" || view === "clip") && workspace.classList.contains("full")) params.set("full", "1");
+      if ((view === "files" || view === "clip") && browse === "list") params.set("browse", "list");
       const next = "?" + params.toString();
       if (location.search === next) return;
       if (replace) history.replaceState({ view }, "", next);
@@ -769,20 +906,14 @@
     }
 
     function setFull(on) {
-      const was = workspace.classList.contains("full");
       workspace.classList.toggle("full", on);
       document.body.classList.toggle("maximized", on);
       viewerFull.textContent = on ? "Exit maximize" : "Maximize";
       liveLayouts.classList.remove("open");
       liveLayoutMenu.setAttribute("aria-expanded", "false");
       if (!workspace.classList.contains("live") || !liveCamera) return;
-      if (on && !document.hidden) {
-        viewerNote.textContent = "Live from the camera. Use the layout buttons to arrange the three views.";
-        if (!was || !liveStream) startLiveStream();
-      } else if (!on) {
-        stopLiveStream();
-        viewerNote.textContent = "Maximize to watch the live picture.";
-      }
+      viewerNote.textContent = "Live from the camera. Use the layout buttons to arrange the three views.";
+      if (!document.hidden && !liveStream) startLiveStream();
     }
 
     function savedCameraCard(id) {
@@ -799,6 +930,7 @@
         const card = savedCameraCard(params.get("camera"));
         if (card) selectCamera(card.camera, card);
         if (view === "settings") showForm();
+        browse = params.get("browse") === "list" ? "list" : "icons";
         if (view === "files" || view === "clip") {
           showFiles();
           await loadClips();
@@ -821,8 +953,8 @@
       form.hidden = true;
       explorer.hidden = false;
       panelTitle.textContent = "Files";
-      settings.hidden = false;
-      settings.textContent = "Settings";
+      applyBrowse();
+      syncCameraTools();
       renderExplorer();
       rememberView("files");
     }
@@ -833,13 +965,71 @@
       form.hidden = false;
       explorer.hidden = true;
       panelTitle.textContent = "Setup";
-      settings.hidden = false;
-      settings.textContent = "Files";
+      applyBrowse();
+      syncCameraTools();
       rememberView("settings");
+    }
+
+    function applyBrowse() {
+      explorer.classList.toggle("icons", browse === "icons");
+      document.body.classList.toggle("dense", showingFiles && !workspace.classList.contains("live"));
+      browseBar.hidden = !showingFiles;
+      browseIcons.setAttribute("aria-pressed", browse === "icons" ? "true" : "false");
+      browseList.setAttribute("aria-pressed", browse === "list" ? "true" : "false");
+      browseSort.textContent = recentFirst ? "Newest" : "Oldest";
+    }
+
+    function chooseBrowse(mode) {
+      browse = mode === "list" ? "list" : "icons";
+      applyBrowse();
+      if (showingFiles) renderExplorer();
+      rememberView(viewingFile ? "clip" : "files", true);
     }
 
     function byRecent(a, b) {
       return recentFirst ? b.localeCompare(a) : a.localeCompare(b);
+    }
+
+    function clipHour(file) {
+      const name = file.slice(file.indexOf("/") + 1, file.lastIndexOf("."));
+      return /^\d{6}$/.test(name) ? name.slice(0, 2) : "";
+    }
+
+    function hourLabel(hour) {
+      const clock = (value) => {
+        const suffix = value < 12 ? "AM" : "PM";
+        return (value % 12 || 12) + " " + suffix;
+      };
+      const start = Number(hour);
+      return clock(start) + " - " + clock((start + 1) % 24);
+    }
+
+    function appendHours(parent, files, savedNames, current) {
+      const buckets = new Map();
+      for (const file of files) {
+        const hour = clipHour(file) || "other";
+        if (!buckets.has(hour)) buckets.set(hour, []);
+        buckets.get(hour).push(file);
+      }
+      const hours = [...buckets.keys()].sort((a, b) => (a === "other" ? 1 : b === "other" ? -1 : byRecent(a, b)));
+      hours.forEach((hour, index) => {
+        const band = document.createElement("div");
+        band.className = "hour" + (index % 2 ? " hour-alt" : "");
+        const label = document.createElement("div");
+        label.className = "hour-head";
+        label.textContent = hour === "other" ? "Other" : hourLabel(hour);
+        band.append(label);
+        const group = buckets.get(hour);
+        if (browse === "icons") {
+          const tiles = document.createElement("div");
+          tiles.className = "tiles";
+          for (const file of group) tiles.append(clipTile(file, savedNames, current));
+          band.append(tiles);
+        } else {
+          for (const file of group) band.append(clipRow(file, savedNames, current));
+        }
+        parent.append(band);
+      });
     }
 
     function clockLabel(file) {
@@ -852,6 +1042,38 @@
       if (Number.isFinite(activePercent)) return activePercent;
       if (!activeBytes) return 0;
       return Math.min(99, Math.round(activeBytes / (7 * 1024 * 1024) * 100));
+    }
+
+    function updateLiveProgress() {
+      const file = activeFile.replaceAll("\\", "/");
+      if (!file) return false;
+      let node = null;
+      for (const item of explorer.querySelectorAll(".file")) {
+        if (item.dataset.file === file) {
+          node = item;
+          break;
+        }
+      }
+      if (!node) return false;
+      const percent = livePercent();
+      const button = node.querySelector("button.thumb");
+      if (button) {
+        let badge = button.querySelector(".shot-badge");
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "shot-badge";
+          button.append(badge);
+        }
+        badge.textContent = percent + "%";
+      }
+      const progress = node.querySelector(".progress");
+      if (progress) {
+        const fill = progress.querySelector(".bar > span");
+        if (fill) fill.style.width = Math.max(0, Math.min(100, percent)) + "%";
+        const text = [...progress.childNodes].find((child) => child.nodeType === Node.TEXT_NODE);
+        if (text) text.textContent = percent + "%";
+      }
+      return true;
     }
 
     function progressCell(percent, live) {
@@ -893,7 +1115,9 @@
       if (!days.length) {
         const empty = document.createElement("p");
         empty.className = "empty";
-        empty.textContent = "Clips appear here as they are saved. Older days stay closed until you open them.";
+        empty.textContent = browse === "icons"
+          ? "Clips appear here as they are saved."
+          : "Clips appear here as they are saved. Older days stay closed until you open them.";
         explorer.append(empty);
         return;
       }
@@ -901,13 +1125,14 @@
       const headRow = document.createElement("div");
       headRow.className = "cols";
       const nameHead = document.createElement("span");
-      nameHead.textContent = "Name";
+      nameHead.textContent = "Clip";
       const whenHead = document.createElement("button");
       whenHead.type = "button";
       whenHead.className = "text";
       whenHead.textContent = recentFirst ? "Date and time ↓" : "Date and time ↑";
       whenHead.addEventListener("click", () => {
         recentFirst = !recentFirst;
+        applyBrowse();
         renderExplorer();
       });
       const progressHead = document.createElement("span");
@@ -915,9 +1140,10 @@
       const remarkHead = document.createElement("span");
       remarkHead.textContent = "Remark";
       headRow.append(nameHead, whenHead, progressHead, remarkHead, document.createElement("span"));
-      explorer.append(headRow);
+      if (browse !== "icons") explorer.append(headRow);
       for (const day of days) {
-        const open = openDays.has(day) || (day === newest && !closedDays.has(day));
+        const files = groups.get(day).slice().sort(byRecent);
+        const open = browse === "icons" ? !iconClosed.has(day) : openDays.has(day) || (day === newest && !closedDays.has(day));
         const block = document.createElement("div");
         block.className = "day";
         const head = document.createElement("div");
@@ -930,10 +1156,13 @@
         mark.className = "mark";
         mark.textContent = open ? "▾" : "▸";
         const title = document.createElement("span");
-        title.textContent = day;
+        title.textContent = day + " (" + files.length + ")";
         toggle.append(mark, title);
         toggle.addEventListener("click", () => {
-          if (open) {
+          if (browse === "icons") {
+            if (open) iconClosed.add(day);
+            else iconClosed.delete(day);
+          } else if (open) {
             openDays.delete(day);
             closedDays.add(day);
           } else {
@@ -971,33 +1200,7 @@
         reveal.addEventListener("click", () => revealDay(day));
         head.append(reveal);
         block.append(head);
-        if (open) {
-          for (const file of groups.get(day).slice().sort(byRecent)) {
-            const row = document.createElement("div");
-            const gone = removedFiles.has(file);
-            row.className = "file" + (file === viewingFile ? " playing" : "") + (gone ? " removed" : "");
-            const onDisk = savedNames.has(file);
-            const live = file === current && !onDisk && !removedFiles.has(file);
-            const link = clipButton(file);
-            const name = document.createElement("div");
-            name.className = "fold";
-            if (live) {
-              const spin = document.createElement("span");
-              spin.className = "spin";
-              name.append(spin);
-            }
-            name.append(link);
-            const whenCell = document.createElement("span");
-            whenCell.className = "when";
-            whenCell.textContent = clockLabel(file);
-            const remark = document.createElement("span");
-            remark.className = "remark";
-            remark.textContent = remarkText(file, live);
-            const progress = onDisk || live ? progressCell(live ? livePercent() : 100, live) : document.createElement("span");
-            row.append(name, whenCell, progress, remark, document.createElement("span"));
-            block.append(row);
-          }
-        }
+        if (open) appendHours(block, files, savedNames, current);
         explorer.append(block);
       }
     }
@@ -1067,6 +1270,23 @@
       for (const item of saved.querySelectorAll(".camera-card")) item.setAttribute("aria-pressed", "false");
       for (const item of found.querySelectorAll("button")) item.setAttribute("aria-pressed", "false");
       if (card) card.setAttribute("aria-pressed", "true");
+      syncCameraTools();
+    }
+
+    function selectedSaved() {
+      return [...saved.querySelectorAll(".camera-card")].find((item) => item.getAttribute("aria-pressed") === "true") || null;
+    }
+
+    function syncCameraTools() {
+      const card = selectedSaved();
+      const ready = Boolean(card);
+      toolSettings.disabled = !Number(form.deviceId.value);
+      toolFiles.disabled = !ready;
+      toolLive.disabled = !ready;
+      const live = workspace.classList.contains("live");
+      toolSettings.setAttribute("aria-pressed", !live && form.hidden === false && !showingFiles ? "true" : "false");
+      toolFiles.setAttribute("aria-pressed", showingFiles && !live ? "true" : "false");
+      toolLive.setAttribute("aria-pressed", live ? "true" : "false");
     }
 
     function icon(path) {
@@ -1082,18 +1302,6 @@
       shape.setAttribute("stroke-linejoin", "round");
       svg.append(shape);
       return svg;
-    }
-
-    function actionButton(label, path, className, onClick) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = className;
-      button.title = label;
-      const text = document.createElement("span");
-      text.textContent = label;
-      button.append(icon(path), text);
-      button.addEventListener("click", onClick);
-      return button;
     }
 
     function cameraButton(camera) {
@@ -1131,6 +1339,7 @@
       saved.replaceChildren();
       if (!cameras.length) {
         emptyNote(saved, "No saved cameras yet. Start a download and the camera is listed here.");
+        syncCameraTools();
         return;
       }
       for (const camera of cameras) {
@@ -1145,26 +1354,11 @@
         const where = document.createElement("p");
         where.className = "camera-where";
         where.textContent = camera.host || camera.ip || "";
-        const actions = document.createElement("div");
-        actions.className = "camera-actions";
-        actions.append(
-          actionButton("Settings", "M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM4 12h2M18 12h2M12 4v2M12 18v2", "", () => {
-            selectCamera(camera, card);
-            showForm();
-          }),
-          actionButton("Files", "M4 4h6l2 2h8v14H4z", "", () => {
-            selectCamera(camera, card);
-            showFiles();
-            loadClips();
-          }),
-          actionButton("Live", "M15 10l5-3v10l-5-3zM4 7h9v10H4z", "live", () => {
-            selectCamera(camera, card);
-            showLive(camera);
-          })
-        );
-        card.append(pick, where, actions);
+        if (Number(camera.id) === Number(form.deviceId.value)) card.setAttribute("aria-pressed", "true");
+        card.append(pick, where);
         saved.append(card);
       }
+      syncCameraTools();
     }
 
     function showStartedCamera() {
@@ -1180,6 +1374,7 @@
         hasLogin: Boolean(form.password.value || form.password.placeholder)
       };
       renderSaved([...cameras.filter((camera) => camera.id !== id), next]);
+      syncCameraTools();
     }
 
     async function loadSaved() {
@@ -1399,7 +1594,7 @@
         if (liveStream) stopLiveStream();
         return;
       }
-      if (workspace.classList.contains("full")) startLiveStream();
+      if (!liveStream) startLiveStream();
     });
 
     viewerClose.addEventListener("click", () => closeViewer());
@@ -1410,10 +1605,40 @@
       rememberView(view);
     });
 
-    settings.addEventListener("click", () => {
-      if (showingFiles) showForm();
-      else showFiles();
+    browseIcons.addEventListener("click", () => chooseBrowse("icons"));
+    browseList.addEventListener("click", () => chooseBrowse("list"));
+    browseSort.addEventListener("click", () => {
+      recentFirst = !recentFirst;
+      applyBrowse();
+      if (showingFiles) renderExplorer();
     });
+
+    toolSettings.addEventListener("click", () => {
+      const card = selectedSaved();
+      if (card) selectCamera(card.camera, card);
+      showForm();
+    });
+    toolFiles.addEventListener("click", () => {
+      const card = selectedSaved();
+      if (!card) return;
+      selectCamera(card.camera, card);
+      showFiles();
+      loadClips();
+    });
+    toolLive.addEventListener("click", () => {
+      const card = selectedSaved();
+      if (!card) return;
+      selectCamera(card.camera, card);
+      showLive(card.camera);
+    });
+    for (const [button, label, path] of [
+      [toolSettings, "Settings", "M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM4 12h2M18 12h2M12 4v2M12 18v2"],
+      [toolFiles, "Files", "M4 4h6l2 2h8v14H4z"],
+      [toolLive, "Live", "M15 10l5-3v10l-5-3zM4 7h9v10H4z"]
+    ]) {
+      button.prepend(icon(path));
+      button.title = label;
+    }
 
     const events = new EventSource("/api/events");
     events.onmessage = (event) => {
@@ -1482,7 +1707,7 @@
         activeFile = body.file || activeFile;
         activeBytes = body.bytes || 0;
         activePercent = Number.isFinite(body.percent) ? body.percent : null;
-        if (showingFiles) renderExplorer();
+        if (showingFiles && !updateLiveProgress()) renderExplorer();
       }
     };
 
