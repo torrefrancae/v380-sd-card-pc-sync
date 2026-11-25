@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="3600">
   <title>V380 SD sync</title>
   <style>
     :root { color-scheme: light; --ink: #1a1d21; --muted: #5c6570; --line: #e2e6eb; --accent: #b8431f; --card: #fff; }
@@ -170,12 +169,21 @@
     #live-split.layout-stack { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); }
     #live-split.layout-focus { grid-template-columns: minmax(0, 1fr) minmax(112px, 160px); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
     #live-split.layout-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; }
-    #live-split.layout-pair canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; }
-    #live-split.layout-pair canvas:nth-child(3) { width: min(420px, 36%); justify-self: center; }
+    #live-split.layout-pair .pane { width: 100%; aspect-ratio: 16 / 9; }
+    #live-split.layout-pair .pane:nth-child(3) { width: min(420px, 36%); justify-self: center; }
     #live-split.layout-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
-    #live-split.layout-grid canvas:nth-child(3) { grid-column: 1 / span 2; width: calc(50% - 4px); justify-self: center; }
-    #live-split canvas { width: 100%; height: 100%; background: #111; border-radius: 10px; display: block; }
-    #live-split.layout-focus canvas { cursor: pointer; }
+    #live-split.layout-grid .pane:nth-child(3) { grid-column: 1 / span 2; width: calc(50% - 4px); justify-self: center; }
+    #live-split .pane { position: relative; min-width: 0; min-height: 0; }
+    #live-split canvas { position: absolute; inset: 0; width: 100%; height: 100%; background: #111; border-radius: 10px; display: block; }
+    #live-split.layout-focus .pane, #live-split.layout-focus canvas { cursor: pointer; }
+    .pane-bar { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px; opacity: 0; pointer-events: none; }
+    #live-split:hover .pane-bar, #live-split:focus-within .pane-bar { opacity: 1; }
+    .pane-num { min-width: 28px; height: 28px; display: grid; place-items: center; border-radius: 999px; background: rgba(17, 17, 17, 0.78); color: #fff; font-size: 13px; font-weight: 700; }
+    .pane-swap { position: relative; pointer-events: auto; }
+    .pane-swap-button { padding: 4px 10px; border-radius: 999px; background: rgba(17, 17, 17, 0.78); color: #fff; font-size: 12px; }
+    .pane-swap-list { display: none; position: absolute; top: calc(100% + 4px); right: 0; z-index: 4; flex-direction: column; gap: 4px; min-width: 112px; padding: 6px; border-radius: 12px; background: rgba(17, 17, 17, 0.92); }
+    .pane-swap.open .pane-swap-list { display: flex; }
+    .pane-swap-list button { width: 100%; text-align: left; padding: 6px 10px; border-radius: 8px; background: transparent; color: #fff; font-size: 12px; }
     #viewer #live-view.live-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; max-height: none; margin: 0; border-radius: 0; pointer-events: none; }
     #viewer-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .warn, .alert { background: #fff4e8; border: 1px solid #e7c7a4; border-radius: 12px; padding: 10px 12px; }
@@ -406,9 +414,9 @@
           <span id="clip-end">0:00</span>
         </div>
         <div id="live-split" class="layout-pair" hidden>
-          <canvas></canvas>
-          <canvas></canvas>
-          <canvas></canvas>
+          <div class="pane"><canvas></canvas><div class="pane-bar"><span class="pane-num">1</span><div class="pane-swap"><button type="button" class="pane-swap-button" aria-haspopup="listbox" aria-expanded="false">Swap</button><div class="pane-swap-list" role="listbox"></div></div></div></div>
+          <div class="pane"><canvas></canvas><div class="pane-bar"><span class="pane-num">2</span><div class="pane-swap"><button type="button" class="pane-swap-button" aria-haspopup="listbox" aria-expanded="false">Swap</button><div class="pane-swap-list" role="listbox"></div></div></div></div>
+          <div class="pane"><canvas></canvas><div class="pane-bar"><span class="pane-num">3</span><div class="pane-swap"><button type="button" class="pane-swap-button" aria-haspopup="listbox" aria-expanded="false">Swap</button><div class="pane-swap-list" role="listbox"></div></div></div></div>
         </div>
       </section>
     </div>
@@ -462,7 +470,8 @@
     const liveSplit = document.querySelector("#live-split");
     const liveLayouts = document.querySelector("#live-layouts");
     const liveLayoutMenu = document.querySelector("#live-layout-menu");
-    const livePanes = [...liveSplit.querySelectorAll("canvas")];
+    const liveSlots = [...liveSplit.querySelectorAll(".pane")];
+    const livePanes = liveSlots.map((slot) => slot.querySelector("canvas"));
     let livePaint = 0;
     let clipPaint = 0;
     let liveStream = null;
@@ -471,20 +480,28 @@
     const layoutKey = "v380-layout";
     const layoutNames = ["stack", "row", "focus", "pair", "grid"];
 
+    function readViewOrder(value) {
+      const order = Array.isArray(value) ? value.map(Number) : [];
+      const unique = new Set(order);
+      if (order.length === 3 && unique.size === 3 && order.every((item) => item >= 0 && item <= 2)) return order;
+      return [0, 1, 2];
+    }
+
     function readStoredLayout() {
       try {
         const saved = JSON.parse(localStorage.getItem(layoutKey) || "");
         const layout = layoutNames.includes(saved.layout) ? saved.layout : "pair";
         const focus = Number.isInteger(saved.focus) && saved.focus >= 0 && saved.focus < 3 ? saved.focus : 0;
-        return { layout, focus };
+        return { layout, focus, order: readViewOrder(saved.order) };
       } catch {
-        return { layout: "pair", focus: 0 };
+        return { layout: "pair", focus: 0, order: [0, 1, 2] };
       }
     }
 
     const storedLayout = readStoredLayout();
     let liveLayout = storedLayout.layout;
     let liveFocus = storedLayout.focus;
+    let viewOrder = storedLayout.order;
     const panelTitle = document.querySelector("#panel-title");
     const toolSettings = document.querySelector("#tool-settings");
     const toolFiles = document.querySelector("#tool-files");
@@ -716,7 +733,7 @@
           canvas.width = boxWidth;
           canvas.height = boxHeight;
         }
-        if (liveLayout === "pair") canvas.style.aspectRatio = width + " / " + sliceHeight;
+        if (liveLayout === "pair") liveSlots[index].style.aspectRatio = width + " / " + sliceHeight;
         const scale = Math.min(boxWidth / width, boxHeight / sliceHeight);
         const drawWidth = width * scale;
         const drawHeight = sliceHeight * scale;
@@ -726,7 +743,13 @@
         const ctx = canvas.getContext("2d");
         ctx.fillStyle = "#111";
         ctx.fillRect(0, 0, boxWidth, boxHeight);
-        ctx.drawImage(frame, 0, sliceHeight * index, width, sliceHeight, (boxWidth - drawWidth) / 2, destY, drawWidth, drawHeight);
+        const source = viewOrder[index];
+        const originX = (boxWidth - drawWidth) / 2;
+        ctx.drawImage(frame, 0, sliceHeight * source, width, sliceHeight, originX, destY, drawWidth, drawHeight);
+        const bar = liveSlots[index].querySelector(".pane-bar");
+        bar.style.left = Math.max(8, originX + 8) + "px";
+        bar.style.right = Math.max(8, boxWidth - originX - drawWidth + 8) + "px";
+        bar.style.top = Math.max(8, destY + 8) + "px";
       });
     }
 
@@ -797,12 +820,18 @@
       } finally {
         clearInterval(stall);
       }
-      if (token === playToken && liveStream === controller && liveWatching()) {
-        liveStream = null;
-        setTimeout(() => {
-          if (token === playToken && liveWatching()) readLive(camera, token);
-        }, 800);
+      if (token !== playToken) return;
+      if (!liveWatching()) {
+        if (liveStream === controller) liveStream = null;
+        return;
       }
+      setTimeout(() => {
+        if (token !== playToken || !liveWatching()) {
+          if (liveStream === controller) liveStream = null;
+          return;
+        }
+        readLive(camera, token);
+      }, 800);
     }
 
     function liveWatching() {
@@ -842,40 +871,83 @@
       if (Number.isInteger(focus) && focus >= 0 && focus < livePanes.length) liveFocus = focus;
       liveSplit.classList.remove("layout-stack", "layout-row", "layout-focus", "layout-pair", "layout-grid");
       liveSplit.classList.add("layout-" + liveLayout);
-      if (liveLayout !== "pair") livePanes.forEach((canvas) => { canvas.style.aspectRatio = ""; });
+      if (liveLayout !== "pair") liveSlots.forEach((slot) => { slot.style.aspectRatio = ""; });
       let smallRow = 0;
-      livePanes.forEach((canvas, index) => {
-        canvas.style.gridColumn = "";
-        canvas.style.gridRow = "";
-        canvas.classList.toggle("focus", liveLayout === "focus" && index === liveFocus);
+      liveSlots.forEach((slot, index) => {
+        slot.style.gridColumn = "";
+        slot.style.gridRow = "";
+        slot.classList.toggle("focus", liveLayout === "focus" && index === liveFocus);
         if (liveLayout !== "focus" || index === liveFocus) return;
         smallRow += 1;
-        canvas.style.gridColumn = "2";
-        canvas.style.gridRow = String(smallRow);
+        slot.style.gridColumn = "2";
+        slot.style.gridRow = String(smallRow);
       });
       if (liveLayout === "focus") {
-        const large = livePanes[liveFocus];
+        const large = liveSlots[liveFocus];
         large.style.gridColumn = "1";
         large.style.gridRow = "1 / span 2";
       }
       if (liveLayout === "pair") {
-        livePanes[0].style.gridColumn = "1";
-        livePanes[0].style.gridRow = "1";
-        livePanes[1].style.gridColumn = "2";
-        livePanes[1].style.gridRow = "1";
-        livePanes[2].style.gridColumn = "1 / span 2";
-        livePanes[2].style.gridRow = "2";
+        liveSlots[0].style.gridColumn = "1";
+        liveSlots[0].style.gridRow = "1";
+        liveSlots[1].style.gridColumn = "2";
+        liveSlots[1].style.gridRow = "1";
+        liveSlots[2].style.gridColumn = "1 / span 2";
+        liveSlots[2].style.gridRow = "2";
       }
       const layoutLabels = { stack: "Vertical", row: "Horizontal", focus: "Focus", pair: "Pair", grid: "Grid" };
       liveLayoutMenu.textContent = layoutLabels[liveLayout] || "Pair";
+      paintPaneTools();
       try {
-        localStorage.setItem(layoutKey, JSON.stringify({ layout: liveLayout, focus: liveFocus }));
+        localStorage.setItem(layoutKey, JSON.stringify({ layout: liveLayout, focus: liveFocus, order: viewOrder }));
       } catch {
         /* The choice still stays in the page address. */
       }
       liveLayouts.querySelectorAll("button[data-layout]").forEach((button) => {
         button.setAttribute("aria-pressed", button.dataset.layout === liveLayout ? "true" : "false");
       });
+    }
+
+    function closeSwaps() {
+      liveSplit.querySelectorAll(".pane-swap.open").forEach((menu) => {
+        menu.classList.remove("open");
+        const opener = menu.querySelector(".pane-swap-button");
+        if (opener) opener.setAttribute("aria-expanded", "false");
+      });
+    }
+
+    function paintPaneTools() {
+      liveSlots.forEach((slot, index) => {
+        const camera = viewOrder[index] + 1;
+        slot.querySelector(".pane-num").textContent = String(camera);
+        const list = slot.querySelector(".pane-swap-list");
+        list.replaceChildren();
+        viewOrder.forEach((source) => {
+          if (source === viewOrder[index]) return;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.dataset.camera = String(source + 1);
+          button.textContent = "Camera " + (source + 1);
+          list.append(button);
+        });
+      });
+    }
+
+    function swapPane(slotIndex, cameraNumber) {
+      const other = viewOrder.indexOf(cameraNumber - 1);
+      if (other < 0 || other === slotIndex) return;
+      const next = viewOrder.slice();
+      const held = next[slotIndex];
+      next[slotIndex] = next[other];
+      next[other] = held;
+      viewOrder = next;
+      paintPaneTools();
+      try {
+        localStorage.setItem(layoutKey, JSON.stringify({ layout: liveLayout, focus: liveFocus, order: viewOrder }));
+      } catch {
+        /* The choice still stays in the page address. */
+      }
+      rememberView(workspace.classList.contains("live") ? "live" : "clip", true);
     }
 
     function stopLive() {
@@ -1174,7 +1246,8 @@
       if (file && (message.startsWith("new ") || message.startsWith("older "))) {
         activeFile = file;
         setNote("");
-        if (!showingFiles) showFiles();
+        const viewerOpen = !viewer.hidden && (workspace.classList.contains("live") || viewingFile);
+        if (!showingFiles && !viewerOpen) showFiles();
       }
       if (file && message.startsWith("saved ")) {
         setNote("");
@@ -1192,6 +1265,7 @@
       if (view === "live" || view === "clip") {
         params.set("layout", liveLayout);
         if (liveLayout === "focus") params.set("focus", String(liveFocus));
+        if (viewOrder.some((source, index) => source !== index)) params.set("order", viewOrder.map((source) => source + 1).join("-"));
       }
       if ((view === "live" || view === "clip") && workspace.classList.contains("full")) params.set("full", "1");
       if ((view === "files" || view === "clip") && browse === "list") params.set("browse", "list");
@@ -1241,6 +1315,7 @@
         const picked = Number(params.get("focus"));
         const routeLayout = layoutNames.includes(named) ? named : liveLayout;
         const routeFocus = params.has("focus") && Number.isInteger(picked) ? picked : liveFocus;
+        if (params.has("order")) viewOrder = readViewOrder(params.get("order").split("-").map((item) => Number(item) - 1));
         setLiveLayout(routeLayout, routeFocus);
         if (view === "live" && card) showLive(card.camera);
         if (view === "clip" && params.get("file")) await openViewer(params.get("file"));
@@ -1903,12 +1978,31 @@
       rememberView(workspace.classList.contains("live") ? "live" : "clip", true);
     });
     document.addEventListener("click", (event) => {
+      if (!event.target.closest(".pane-swap")) closeSwaps();
       if (liveLayouts.contains(event.target)) return;
       liveLayouts.classList.remove("open");
       liveLayoutMenu.setAttribute("aria-expanded", "false");
     });
-    livePanes.forEach((canvas, index) => {
-      canvas.addEventListener("click", () => {
+    liveSplit.addEventListener("click", (event) => {
+      const choice = event.target.closest(".pane-swap-list button");
+      if (choice) {
+        event.stopPropagation();
+        swapPane(liveSlots.indexOf(choice.closest(".pane")), Number(choice.dataset.camera));
+        closeSwaps();
+        return;
+      }
+      const opener = event.target.closest(".pane-swap-button");
+      if (!opener) return;
+      event.stopPropagation();
+      const menu = opener.closest(".pane-swap");
+      const willOpen = !menu.classList.contains("open");
+      closeSwaps();
+      menu.classList.toggle("open", willOpen);
+      opener.setAttribute("aria-expanded", willOpen ? "true" : "false");
+    });
+    liveSlots.forEach((slot, index) => {
+      slot.addEventListener("click", (event) => {
+        if (event.target.closest(".pane-swap")) return;
         if (liveSplit.hidden || liveLayout !== "focus") return;
         setLiveLayout("focus", index);
         rememberView(workspace.classList.contains("live") ? "live" : "clip", true);
@@ -1923,6 +2017,18 @@
       }
       if (!liveStream) startLiveStream();
     });
+    setInterval(() => {
+      if (viewer.hidden || !liveWatching()) return;
+      if (!liveStream) startLiveStream();
+    }, 4000);
+    setInterval(() => {
+      if (!viewer.hidden && workspace.classList.contains("live") && liveCamera) {
+        if (!document.hidden) startLiveStream();
+        return;
+      }
+      if (!viewer.hidden && viewingFile) return;
+      location.reload();
+    }, 60 * 60 * 1000);
 
     clipPlay.addEventListener("click", () => {
       if (!viewingFile) return;
