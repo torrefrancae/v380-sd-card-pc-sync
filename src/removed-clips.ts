@@ -72,7 +72,7 @@ export function listedClips(outDir: string | undefined, now = new Date()) {
   const clips = listClips(outDir).map((clip) => ({ ...clip, removed: false }));
   for (const file of removed) {
     if (clips.some((clip) => clip.file.replaceAll("\\", "/") === file)) continue;
-    clips.push({ file, bytes: 0, removed: true });
+    clips.push({ file, bytes: 0, seconds: 0, removed: true });
   }
   return clips;
 }

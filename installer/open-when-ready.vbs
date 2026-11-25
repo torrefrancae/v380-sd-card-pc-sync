@@ -16,10 +16,13 @@ For i = 1 To 90
   WScript.Sleep 1000
 Next
 
+Set net = CreateObject("WScript.Network")
+page = "http://" & net.ComputerName & ":8787"
+
 If ready Then
-  shell.Run "cmd /c start """" http://127.0.0.1:8787", 0, False
+  shell.Run "cmd /c start """" " & page, 0, False
 Else
-  MsgBox "V380 SD Sync is still starting." & vbCrLf & vbCrLf & "Open http://127.0.0.1:8787 in a moment. Refresh the page if it is not ready yet.", 64, "V380 SD Sync"
+  MsgBox "V380 SD Sync is still starting." & vbCrLf & vbCrLf & "Open " & page & " in a moment. Refresh the page if it is not ready yet.", 64, "V380 SD Sync"
 End If
 
 Function PageReady()

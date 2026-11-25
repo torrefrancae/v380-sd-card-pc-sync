@@ -34,8 +34,9 @@
     aside, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: 0 12px 32px rgba(26, 29, 33, 0.05); }
     aside { position: sticky; top: 16px; }
     form { margin: 0; }
-    .panel-bar { display: flex; justify-content: flex-start; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .panel-bar .actions { margin-left: auto; }
+    .panel-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 8px; }
+    .panel-lead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .panel-bar .actions { margin-left: 0; justify-self: end; }
     .panel-bar h2 { margin: 0; }
     .panel-bar .actions { margin-top: 0; }
     .cols, .day-head, .file { display: grid; grid-template-columns: 148px minmax(120px, 0.8fr) 88px minmax(168px, 1fr) 120px; gap: 8px; align-items: center; }
@@ -81,10 +82,12 @@
     #explorer.icons .tiles { display: flex; flex-wrap: nowrap; gap: 6px; margin: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding-bottom: 4px; }
     #explorer.icons .tiles::-webkit-scrollbar { height: 8px; }
     #explorer.icons .tiles::-webkit-scrollbar-thumb { background: #c5ced6; border-radius: 99px; }
-    #explorer.icons .file { display: block; flex: 0 0 132px; width: 132px; margin: 0; padding: 0; background: none; }
+    #explorer.icons { --shot: 198px; }
+    #explorer.icons .file { display: block; flex: 0 0 var(--shot); width: var(--shot); margin: 0; padding: 0; background: none; }
     #explorer.icons .file button.thumb { position: relative; width: 100%; }
     #explorer.icons .shot, #explorer.icons .shot-empty { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 6px; }
     #explorer.icons .shot-time { position: absolute; left: 4px; bottom: 4px; padding: 0 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.62); color: #fff; font-size: 11px; line-height: 1.5; }
+    #explorer.icons .shot-length { position: absolute; right: 4px; top: 4px; padding: 0 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.62); color: #fff; font-size: 11px; line-height: 1.5; }
     #explorer.icons .shot-badge { position: absolute; right: 4px; top: 4px; padding: 0 4px; border-radius: 4px; background: rgba(184, 67, 31, 0.92); color: #fff; font-size: 11px; }
     #explorer.icons .file.playing .shot, #explorer.icons .file.playing .shot-empty { outline: 2px solid var(--accent); outline-offset: 1px; }
     .workspace.watching:has(#explorer.icons) .file > :not(:first-child) { display: block; }
@@ -174,14 +177,18 @@
     }
     body.maximized { overflow: hidden; }
     .workspace.full,
-    .workspace.watching.live.full { position: fixed; inset: 0; z-index: 30; width: 100%; height: 100dvh; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0; padding: 0; background: #111; }
+    .workspace.watching.live.full { position: fixed; inset: 0; z-index: 30; width: 100%; height: 100dvh; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; gap: 0; margin: 0; padding: 0; background: #111; }
     .workspace.full aside, .workspace.full #panel { display: none; }
-    .workspace.full #viewer { height: 100%; min-height: 0; margin: 0; padding: 8px 10px; background: #111; color: #fff; border: 0; border-radius: 0; box-shadow: none; display: flex; flex-direction: column; }
+    .workspace.full #viewer { position: absolute; inset: 0; height: auto; min-height: 0; margin: 0; padding: 8px 10px; background: #111; color: #fff; border: 0; border-radius: 0; box-shadow: none; display: flex; flex-direction: column; }
     .workspace.full #viewer .panel-bar { flex: none; }
     .workspace.full #viewer-note { display: none; }
     .workspace.full #viewer-title, .workspace.full #viewer-note { color: #fff; }
     .workspace.full #viewer video,
-    .workspace.watching.live.full #viewer img { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: contain; }
+    .workspace.watching.live.full #viewer img { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: contain; background: #111; }
+    .workspace.full #player { position: absolute; left: 0; right: 0; top: 56px; bottom: 0; width: 100%; height: auto; max-height: none; object-fit: contain; }
+    .workspace.full.clip-layout #player.clip-source { top: auto; bottom: 0; height: 48px; max-height: 48px; z-index: 5; object-fit: none; object-position: -4000px 0; background: #111; border-radius: 0; }
+    .workspace.full.clip-layout #live-split { position: absolute; left: 8px; right: 8px; top: 56px; bottom: 64px; }
+    .workspace.full.clip-layout #live-layouts { bottom: 64px; }
     .workspace.watching.live.full #live-view.live-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; flex: none; max-height: none; }
     .workspace.full #live-split { flex: 1 1 0; height: auto; min-height: 0; }
   </style>
@@ -207,12 +214,21 @@
       </aside>
       <section class="panel" id="panel">
         <div class="panel-bar">
-          <div id="camera-tools" class="camera-actions">
-            <button type="button" id="tool-settings" disabled>Settings</button>
-            <button type="button" id="tool-files" disabled>Files</button>
-            <button type="button" id="tool-live" class="live" disabled>Live</button>
+          <div class="panel-lead">
+            <div id="camera-tools" class="camera-actions">
+              <button type="button" id="tool-settings" disabled>Settings</button>
+              <button type="button" id="tool-files" disabled>Files</button>
+              <button type="button" id="tool-live" class="live" disabled>Live</button>
+            </div>
+            <h2 id="panel-title">Setup</h2>
           </div>
-          <h2 id="panel-title">Setup</h2>
+          <div id="shot-size" class="browse" hidden>
+            <button type="button" id="shot-minus" class="secondary" aria-label="Smaller">-</button>
+            <button type="button" id="shot-plus" class="secondary" aria-label="Larger">+</button>
+            <button type="button" id="shot-small" class="secondary" aria-pressed="false">Small</button>
+            <button type="button" id="shot-medium" class="secondary" aria-pressed="false">Medium</button>
+            <button type="button" id="shot-large" class="secondary" aria-pressed="true">Large</button>
+          </div>
           <div class="actions">
             <div id="browse" class="browse" hidden>
               <button type="button" id="browse-icons" class="secondary" aria-pressed="true">Icons</button>
@@ -323,12 +339,12 @@
           <h2 id="viewer-title">Clip</h2>
           <div class="actions">
             <div id="live-layouts" hidden>
-              <button type="button" id="live-layout-menu" class="secondary" aria-haspopup="listbox" aria-expanded="false">Horizontal</button>
+              <button type="button" id="live-layout-menu" class="secondary" aria-haspopup="listbox" aria-expanded="false">Pair</button>
               <div id="live-layout-list" role="listbox">
                 <button type="button" class="secondary" data-layout="stack" aria-pressed="false">Vertical</button>
-                <button type="button" class="secondary" data-layout="row" aria-pressed="true">Horizontal</button>
+                <button type="button" class="secondary" data-layout="row" aria-pressed="false">Horizontal</button>
                 <button type="button" class="secondary" data-layout="focus" aria-pressed="false" title="Large view with two small ones on the right. Click a view to swap the large one.">Focus</button>
-                <button type="button" class="secondary" data-layout="pair" aria-pressed="false" title="Two large views with a small one centered below.">Pair</button>
+                <button type="button" class="secondary" data-layout="pair" aria-pressed="true" title="Two large views with a small one centered below.">Pair</button>
               </div>
             </div>
             <button type="button" id="viewer-full" class="secondary">Maximize</button>
@@ -338,7 +354,7 @@
         <p id="viewer-note" class="note"></p>
         <video id="player" controls></video>
         <img id="live-view" alt="" hidden>
-        <div id="live-split" class="layout-row" hidden>
+        <div id="live-split" class="layout-pair" hidden>
           <canvas></canvas>
           <canvas></canvas>
           <canvas></canvas>
@@ -364,11 +380,27 @@
     const liveLayoutMenu = document.querySelector("#live-layout-menu");
     const livePanes = [...liveSplit.querySelectorAll("canvas")];
     let livePaint = 0;
+    let clipPaint = 0;
     let liveStream = null;
     let liveFrame = null;
     let liveCamera = null;
-    let liveLayout = "row";
-    let liveFocus = 0;
+    const layoutKey = "v380-layout";
+    const layoutNames = ["stack", "row", "focus", "pair"];
+
+    function readStoredLayout() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(layoutKey) || "");
+        const layout = layoutNames.includes(saved.layout) ? saved.layout : "pair";
+        const focus = Number.isInteger(saved.focus) && saved.focus >= 0 && saved.focus < 3 ? saved.focus : 0;
+        return { layout, focus };
+      } catch {
+        return { layout: "pair", focus: 0 };
+      }
+    }
+
+    const storedLayout = readStoredLayout();
+    let liveLayout = storedLayout.layout;
+    let liveFocus = storedLayout.focus;
     const panelTitle = document.querySelector("#panel-title");
     const toolSettings = document.querySelector("#tool-settings");
     const toolFiles = document.querySelector("#tool-files");
@@ -393,6 +425,8 @@
     let showingFiles = false;
     let recentFirst = true;
     let browse = "icons";
+    let shotSize = "large";
+    let shotNudge = 0;
     const openDays = new Set();
     const closedDays = new Set();
     const iconClosed = new Set();
@@ -400,6 +434,12 @@
     const browseIcons = document.querySelector("#browse-icons");
     const browseList = document.querySelector("#browse-list");
     const browseSort = document.querySelector("#browse-sort");
+    const shotBar = document.querySelector("#shot-size");
+    const shotMinus = document.querySelector("#shot-minus");
+    const shotPlus = document.querySelector("#shot-plus");
+    const shotSmall = document.querySelector("#shot-small");
+    const shotMedium = document.querySelector("#shot-medium");
+    const shotLarge = document.querySelector("#shot-large");
     const thumbObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
@@ -443,7 +483,21 @@
     function clipTime(file) {
       const name = file.slice(file.indexOf("/") + 1, file.lastIndexOf("."));
       if (!/^\d{6}$/.test(name)) return "";
-      return name.slice(0, 2) + ":" + name.slice(2, 4) + ":" + name.slice(4, 6);
+      const hour = Number(name.slice(0, 2));
+      const suffix = hour < 12 ? "AM" : "PM";
+      return (hour % 12 || 12) + ":" + name.slice(2, 4) + " " + suffix;
+    }
+
+    function clipLength(file) {
+      const clip = clipFiles.find((item) => item.file.replaceAll("\\", "/") === file);
+      const total = clip ? Math.round(Number(clip.seconds) || 0) : 0;
+      if (total <= 0) return "";
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = total % 60;
+      const pad = (value) => String(value).padStart(2, "0");
+      if (hours) return hours + ":" + pad(minutes) + ":" + pad(seconds);
+      return minutes + ":" + pad(seconds);
     }
 
     function clipRow(file, savedNames, current) {
@@ -504,6 +558,13 @@
       time.className = "shot-time";
       time.textContent = clipTime(file);
       button.append(time);
+      const length = clipLength(file);
+      if (length && !live) {
+        const span = document.createElement("span");
+        span.className = "shot-length";
+        span.textContent = length;
+        button.append(span);
+      }
       if (live) {
         const badge = document.createElement("span");
         badge.className = "shot-badge";
@@ -514,10 +575,29 @@
       return button;
     }
 
+    function stopClipPaint() {
+      if (!clipPaint) return;
+      cancelAnimationFrame(clipPaint);
+      clipPaint = 0;
+    }
+
+    function paintClip() {
+      paintPanes(player);
+      clipPaint = requestAnimationFrame(paintClip);
+    }
+
+    function startClipPaint() {
+      stopClipPaint();
+      clipPaint = requestAnimationFrame(paintClip);
+    }
+
     function stopPlayer() {
+      stopClipPaint();
       player.pause();
       player.removeAttribute("src");
       player.load();
+      player.classList.remove("clip-source");
+      workspace.classList.remove("clip-layout");
     }
 
     function findBytes(buf, a, b, from) {
@@ -527,33 +607,36 @@
       return -1;
     }
 
+    function paintPanes(frame) {
+      const video = "videoWidth" in frame;
+      const width = video ? frame.videoWidth : frame.width;
+      const height = video ? frame.videoHeight : frame.height;
+      if (width < 1 || height < 3) return;
+      const sliceHeight = height / 3;
+      livePanes.forEach((canvas, index) => {
+        const rect = canvas.getBoundingClientRect();
+        const boxWidth = Math.max(1, Math.round(rect.width));
+        const boxHeight = Math.max(1, Math.round(rect.height));
+        if (canvas.width !== boxWidth || canvas.height !== boxHeight) {
+          canvas.width = boxWidth;
+          canvas.height = boxHeight;
+        }
+        if (liveLayout === "pair") canvas.style.aspectRatio = width + " / " + sliceHeight;
+        const scale = Math.min(boxWidth / width, boxHeight / sliceHeight);
+        const drawWidth = width * scale;
+        const drawHeight = sliceHeight * scale;
+        let destY = (boxHeight - drawHeight) / 2;
+        if (liveLayout === "pair" && index < 2) destY = boxHeight - drawHeight;
+        if (liveLayout === "pair" && index === 2) destY = 0;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, boxWidth, boxHeight);
+        ctx.drawImage(frame, 0, sliceHeight * index, width, sliceHeight, (boxWidth - drawWidth) / 2, destY, drawWidth, drawHeight);
+      });
+    }
+
     function paintLive() {
-      const frame = liveFrame;
-      if (frame && frame.width > 0 && frame.height > 2) {
-        const width = frame.width;
-        const height = frame.height;
-        const sliceHeight = height / 3;
-        livePanes.forEach((canvas, index) => {
-          const rect = canvas.getBoundingClientRect();
-          const boxWidth = Math.max(1, Math.round(rect.width));
-          const boxHeight = Math.max(1, Math.round(rect.height));
-          if (canvas.width !== boxWidth || canvas.height !== boxHeight) {
-            canvas.width = boxWidth;
-            canvas.height = boxHeight;
-          }
-          if (liveLayout === "pair") canvas.style.aspectRatio = width + " / " + sliceHeight;
-          const scale = Math.min(boxWidth / width, boxHeight / sliceHeight);
-          const drawWidth = width * scale;
-          const drawHeight = sliceHeight * scale;
-          let destY = (boxHeight - drawHeight) / 2;
-          if (liveLayout === "pair" && index < 2) destY = boxHeight - drawHeight;
-          if (liveLayout === "pair" && index === 2) destY = 0;
-          const ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#111";
-          ctx.fillRect(0, 0, boxWidth, boxHeight);
-          ctx.drawImage(frame, 0, sliceHeight * index, width, sliceHeight, (boxWidth - drawWidth) / 2, destY, drawWidth, drawHeight);
-        });
-      }
+      if (liveFrame) paintPanes(liveFrame);
       livePaint = requestAnimationFrame(paintLive);
     }
 
@@ -660,7 +743,7 @@
 
     function setLiveLayout(name, focus) {
       const allowed = ["stack", "row", "focus", "pair"];
-      liveLayout = allowed.includes(name) ? name : "row";
+      liveLayout = allowed.includes(name) ? name : "pair";
       if (Number.isInteger(focus) && focus >= 0 && focus < livePanes.length) liveFocus = focus;
       liveSplit.classList.remove("layout-stack", "layout-row", "layout-focus", "layout-pair");
       liveSplit.classList.add("layout-" + liveLayout);
@@ -688,8 +771,13 @@
         livePanes[2].style.gridColumn = "1 / span 2";
         livePanes[2].style.gridRow = "2";
       }
-      const layoutNames = { stack: "Vertical", row: "Horizontal", focus: "Focus", pair: "Pair" };
-      liveLayoutMenu.textContent = layoutNames[liveLayout] || "Horizontal";
+      const layoutLabels = { stack: "Vertical", row: "Horizontal", focus: "Focus", pair: "Pair" };
+      liveLayoutMenu.textContent = layoutLabels[liveLayout] || "Pair";
+      try {
+        localStorage.setItem(layoutKey, JSON.stringify({ layout: liveLayout, focus: liveFocus }));
+      } catch {
+        /* The choice still stays in the page address. */
+      }
       liveLayouts.querySelectorAll("button[data-layout]").forEach((button) => {
         button.setAttribute("aria-pressed", button.dataset.layout === liveLayout ? "true" : "false");
       });
@@ -737,21 +825,22 @@
       rememberView("live");
     }
 
-    function playable(codec) {
-      if (codec !== "hevc" && codec !== "h265") return true;
-      const probe = document.createElement("video");
-      return probe.canPlayType('video/mp4; codecs="hvc1.1.6.L120.B0"') !== "" || probe.canPlayType('video/mp4; codecs="hev1.1.6.L120.B0"') !== "";
-    }
-
     function showViewer(file) {
       stopLive();
       workspace.classList.remove("live");
+      workspace.classList.add("clip-layout");
       player.hidden = false;
+      player.classList.add("clip-source");
       viewingFile = file;
       viewer.hidden = false;
       workspace.classList.add("watching");
-      viewerTitle.textContent = file;
+      viewerTitle.textContent = clockLabel(file);
       viewerNote.hidden = false;
+      liveLayouts.hidden = false;
+      setLiveLayout(liveLayout, liveFocus);
+      liveSplit.hidden = false;
+      startClipPaint();
+      setFull(true);
       applyBrowse();
       rememberView("clip");
     }
@@ -789,50 +878,19 @@
       viewerNote.textContent = "Opening the clip...";
       if (showingFiles) renderExplorer();
       const params = new URLSearchParams({ file, outDir: form.outDir.value });
-      try {
-        await fetch("/api/preview/cancel", { method: "POST", signal: abort.signal });
+      const hide = () => {
         if (token !== playToken) return;
-        const response = await fetch("/api/clip?" + params, { signal: abort.signal });
-        const body = await response.json();
+        viewerNote.hidden = true;
+      };
+      player.addEventListener("loadeddata", hide, { once: true });
+      player.addEventListener("error", () => {
         if (token !== playToken) return;
-        if (!response.ok) throw new Error(body.error || "Could not open the clip");
-        if (!body.exists) {
-          viewerNote.textContent = body.message;
-          return;
-        }
-        if (playable(body.codec)) {
-          viewerNote.hidden = true;
-          player.src = body.media;
-          player.play().catch(() => undefined);
-          return;
-        }
-        viewerNote.textContent = "Preparing a copy this browser can play. This happens once per clip.";
-        for (;;) {
-          if (token !== playToken) return;
-          const preview = await fetch("/api/preview?" + params, { signal: abort.signal });
-          const prepared = await preview.json();
-          if (token !== playToken) return;
-          if (!preview.ok) throw new Error(prepared.error || "Could not prepare the clip");
-          if (prepared.ready) {
-            viewerNote.hidden = true;
-            player.src = prepared.url;
-            player.play().catch(() => undefined);
-            return;
-          }
-          if (prepared.message) viewerNote.textContent = prepared.message;
-          await new Promise((resolve, reject) => {
-            const timer = setTimeout(resolve, 1000);
-            abort.signal.addEventListener("abort", () => {
-              clearTimeout(timer);
-              reject(new DOMException("aborted", "AbortError"));
-            }, { once: true });
-          });
-        }
-      } catch (error) {
-        if (error.name === "AbortError" || token !== playToken) return;
         viewerNote.hidden = false;
-        viewerNote.textContent = error.message;
-      }
+        viewerNote.textContent = "Could not open the clip.";
+      }, { once: true });
+      player.src = "/api/play?" + params;
+      player.play().catch(() => undefined);
+      abort.signal.addEventListener("abort", () => stopPlayer(), { once: true });
     }
 
     function setNote(text) {
@@ -893,12 +951,14 @@
       const id = Number(form.deviceId.value);
       if (id) params.set("camera", String(id));
       if (view === "clip" && viewingFile) params.set("file", viewingFile);
-      if (view === "live") {
+      if (view === "live" || view === "clip") {
         params.set("layout", liveLayout);
         if (liveLayout === "focus") params.set("focus", String(liveFocus));
       }
       if ((view === "live" || view === "clip") && workspace.classList.contains("full")) params.set("full", "1");
       if ((view === "files" || view === "clip") && browse === "list") params.set("browse", "list");
+      if ((view === "files" || view === "clip") && shotSize !== "large") params.set("size", shotSize);
+      if ((view === "files" || view === "clip") && shotNudge) params.set("nudge", String(shotNudge));
       const next = "?" + params.toString();
       if (location.search === next) return;
       if (replace) history.replaceState({ view }, "", next);
@@ -931,15 +991,19 @@
         if (card) selectCamera(card.camera, card);
         if (view === "settings") showForm();
         browse = params.get("browse") === "list" ? "list" : "icons";
+        shotSize = params.get("size") === "small" || params.get("size") === "medium" ? params.get("size") : "large";
+        const rawNudge = Number(params.get("nudge"));
+        shotNudge = Number.isFinite(rawNudge) ? Math.round(Math.min(2, Math.max(-0.8, rawNudge)) * 10) / 10 : 0;
         if (view === "files" || view === "clip") {
           showFiles();
           await loadClips();
         }
-        if (view === "live" && card) {
-          const picked = Number(params.get("focus"));
-          showLive(card.camera);
-          setLiveLayout(params.get("layout"), Number.isInteger(picked) ? picked : liveFocus);
-        }
+        const named = params.get("layout");
+        const picked = Number(params.get("focus"));
+        const routeLayout = layoutNames.includes(named) ? named : liveLayout;
+        const routeFocus = params.has("focus") && Number.isInteger(picked) ? picked : liveFocus;
+        setLiveLayout(routeLayout, routeFocus);
+        if (view === "live" && card) showLive(card.camera);
         if (view === "clip" && params.get("file")) await openViewer(params.get("file"));
         if (params.get("full") === "1" && !viewer.hidden) setFull(true);
       } finally {
@@ -973,10 +1037,34 @@
     function applyBrowse() {
       explorer.classList.toggle("icons", browse === "icons");
       document.body.classList.toggle("dense", showingFiles && !workspace.classList.contains("live"));
+      const base = shotSize === "small" ? 88 : shotSize === "medium" ? 132 : 198;
+      explorer.style.setProperty("--shot", Math.round(base * (1 + shotNudge)) + "px");
       browseBar.hidden = !showingFiles;
+      shotBar.hidden = !showingFiles;
+      const moved = Math.round(Math.abs(shotNudge) * 100);
+      shotMinus.textContent = shotNudge < 0 ? "- " + moved + "%" : "-";
+      shotPlus.textContent = shotNudge > 0 ? "+ " + moved + "%" : "+";
+      shotSmall.setAttribute("aria-pressed", shotSize === "small" ? "true" : "false");
+      shotMedium.setAttribute("aria-pressed", shotSize === "medium" ? "true" : "false");
+      shotLarge.setAttribute("aria-pressed", shotSize === "large" ? "true" : "false");
       browseIcons.setAttribute("aria-pressed", browse === "icons" ? "true" : "false");
       browseList.setAttribute("aria-pressed", browse === "list" ? "true" : "false");
       browseSort.textContent = recentFirst ? "Newest" : "Oldest";
+    }
+
+    function chooseShotSize(size) {
+      shotSize = size === "small" || size === "medium" ? size : "large";
+      shotNudge = 0;
+      applyBrowse();
+      if (showingFiles) rememberView(viewingFile ? "clip" : "files", true);
+    }
+
+    function nudgeShot(step) {
+      const next = Math.round((shotNudge + step) * 10) / 10;
+      if (1 + next < 0.2 || 1 + next > 3) return;
+      shotNudge = next;
+      applyBrowse();
+      if (showingFiles) rememberView(viewingFile ? "clip" : "files", true);
     }
 
     function chooseBrowse(mode) {
@@ -1573,7 +1661,7 @@
       setLiveLayout(button.dataset.layout, liveFocus);
       liveLayouts.classList.remove("open");
       liveLayoutMenu.setAttribute("aria-expanded", "false");
-      rememberView("live", true);
+      rememberView(workspace.classList.contains("live") ? "live" : "clip", true);
     });
     document.addEventListener("click", (event) => {
       if (liveLayouts.contains(event.target)) return;
@@ -1584,7 +1672,7 @@
       canvas.addEventListener("click", () => {
         if (liveSplit.hidden || liveLayout !== "focus") return;
         setLiveLayout("focus", index);
-        rememberView("live", true);
+        rememberView(workspace.classList.contains("live") ? "live" : "clip", true);
       });
     });
 
@@ -1605,6 +1693,11 @@
       rememberView(view);
     });
 
+    shotMinus.addEventListener("click", () => nudgeShot(-0.2));
+    shotPlus.addEventListener("click", () => nudgeShot(0.2));
+    shotSmall.addEventListener("click", () => chooseShotSize("small"));
+    shotMedium.addEventListener("click", () => chooseShotSize("medium"));
+    shotLarge.addEventListener("click", () => chooseShotSize("large"));
     browseIcons.addEventListener("click", () => chooseBrowse("icons"));
     browseList.addEventListener("click", () => chooseBrowse("list"));
     browseSort.addEventListener("click", () => {

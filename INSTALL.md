@@ -47,7 +47,7 @@ Do this in the V380 app on Android or iOS before you use this program. The camer
 ## Setup
 
 1. Run `V380SdSync-Setup.exe`. It does not ask for an administrator password.
-2. Setup stays open while the program starts. The first start can take a minute. The browser opens [http://127.0.0.1:8787](http://127.0.0.1:8787) only after that page answers. You do not type that address.
+2. Setup stays open while the program starts. The first start can take a minute. The browser opens `http://<this-computer-name>:8787` only after that page answers. You do not type that address. `http://127.0.0.1:8787` still opens the same page.
 3. Click **Find on network** and select the camera. **Scan V380** is only for a PC that already has the V380 app installed and signed in.
 4. Enter the **username** and **password** you set in the phone app. Use that same login here.
 5. Click **Save camera**, or click **Start download**. Starting a download saves the camera on this PC.

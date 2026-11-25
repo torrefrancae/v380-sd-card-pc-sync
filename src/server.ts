@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { appRoot } from "./app-root.js";
@@ -12,6 +13,7 @@ import { ensureDefaultKeep, parseKeep, pruneKept, readKeep, writeKeep } from "./
 import { listedClips, rememberRemoved, syncRemoved } from "./removed-clips.js";
 import { stopLive, streamLive } from "./live.js";
 import { ensureThumb } from "./thumb.js";
+import { streamPlay } from "./play.js";
 import { forgetCamera, rememberCamera, savedCamera, savedCameras, savedIds } from "./saved-cameras.js";
 import { deviceFromV380, readV380Devices } from "./v380-store.js";
 
@@ -265,6 +267,11 @@ const server = http.createServer(async (req, res) => {
       send(res, 200, { clips: listedClips(url.searchParams.get("outDir") ?? undefined) });
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/play") {
+      await ensureFfmpeg();
+      streamPlay(req, res, url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? "");
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/api/clip") {
       send(res, 200, await clipInfo(url.searchParams.get("outDir") ?? undefined, url.searchParams.get("file") ?? ""));
       return;
@@ -440,8 +447,9 @@ server.on("error", (error: NodeJS.ErrnoException) => {
   console.error(error.message);
   process.exit(1);
 });
-server.listen(port, "127.0.0.1", () => {
-  const address = `http://127.0.0.1:${port}`;
+server.listen(port, "0.0.0.0", () => {
+  const name = os.hostname().trim() || "localhost";
+  const address = `http://${name}:${port}`;
   console.log(`V380 sync is at ${address}`);
   ensureDefaultKeep(path.join(root, "recordings"));
   sweepOldVideos();

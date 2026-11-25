@@ -4,6 +4,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { appRoot, ffmpegBin } from "./app-root.js";
+import { mp4Seconds } from "./mp4-time.js";
 
 const CLIP = /^\d{4}-\d{2}-\d{2}\/\d{6}\.mp4$/;
 const jobs = new Map<string, Promise<void>>();
@@ -21,6 +22,7 @@ export function cancelPreview() {
 export interface SavedClip {
   file: string;
   bytes: number;
+  seconds: number;
 }
 
 export function resolveOutDir(value: string | undefined): string {
@@ -60,7 +62,7 @@ export function listClips(outDir: string | undefined): SavedClip[] {
       const full = path.join(folder, name);
       const stat = fs.statSync(full);
       if (!stat.isFile() || stat.size <= 4096) continue;
-      clips.push({ file: `${date}/${name}`, bytes: stat.size });
+      clips.push({ file: `${date}/${name}`, bytes: stat.size, seconds: Math.round(mp4Seconds(full, stat.size, stat.mtimeMs)) });
     }
   }
   clips.sort((a, b) => a.file.localeCompare(b.file));
