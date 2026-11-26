@@ -45,9 +45,12 @@
     .cols { padding: 0 8px 8px; border-bottom: 1px solid #efeae1; color: #6b645b; font-size: 12px; }
     button.text { background: none; color: inherit; border-radius: 0; padding: 0; font: inherit; text-align: left; }
     .day { margin-top: 4px; }
-    .hour { margin: 6px 0 6px 40px; padding: 8px 8px 10px; border-radius: 10px; background: #e7eef6; }
+    .hours { position: relative; display: flex; flex-direction: column; gap: 8px; padding-left: 72px; }
+    .hour { position: relative; margin: 0; padding: 8px; border-radius: 10px; background: #e7eef6; }
     .hour-alt { background: #f6efe6; }
-    .hour-head { margin: 0 0 6px; color: #3d4650; font-size: 13px; font-weight: 650; }
+    .hour:not(:last-child)::before { content: ""; position: absolute; left: -16px; top: 50%; bottom: calc(-50% - 8px); width: 2px; background: #c5ced6; transform: translateX(-50%); }
+    .hour-head { position: absolute; top: 50%; right: calc(100% + 28px); margin: 0; transform: translateY(-50%); color: #3d4650; font-size: 13px; font-weight: 680; line-height: 1; white-space: nowrap; }
+    .hour-head::before { content: ""; position: absolute; left: calc(100% + 12px); top: 50%; width: 9px; height: 9px; box-sizing: border-box; border: 2px solid var(--accent); border-radius: 50%; background: #fff; transform: translate(-50%, -50%); z-index: 1; }
     .hour .file { padding-left: 0; }
     .day-head { font-weight: 650; padding: 7px 8px; border-radius: 8px; }
     .day-head:hover { background: #f7f1e7; }
@@ -85,8 +88,7 @@
     #explorer.icons .day-head .remark,
     #explorer.icons .day-head .progress { display: none; }
     #panel, #explorer, #explorer .day, #explorer.icons .hour { min-width: 0; }
-    #explorer.icons .hour { margin-left: 36px; }
-    #explorer.icons .hour-head { font-size: 12px; }
+    #explorer.icons .hour-head { font-size: 13px; }
     #explorer.icons .tiles { display: flex; flex-wrap: nowrap; gap: 6px; margin: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding-bottom: 4px; }
     #explorer.icons .tiles::-webkit-scrollbar { height: 8px; }
     #explorer.icons .tiles::-webkit-scrollbar-thumb { background: #c5ced6; border-radius: 99px; }
@@ -537,9 +539,7 @@
     let browse = "icons";
     let shotSize = "large";
     let shotNudge = 0;
-    const openDays = new Set();
-    const closedDays = new Set();
-    const iconClosed = new Set();
+    let openDay = null;
     const browseBar = document.querySelector("#browse");
     const browseIcons = document.querySelector("#browse-icons");
     const browseList = document.querySelector("#browse-list");
@@ -1469,12 +1469,8 @@
     }
 
     function hourLabel(hour) {
-      const clock = (value) => {
-        const suffix = value < 12 ? "AM" : "PM";
-        return (value % 12 || 12) + " " + suffix;
-      };
       const start = Number(hour);
-      return clock(start) + " - " + clock((start + 1) % 24);
+      return (start % 12 || 12) + (start < 12 ? "am" : "pm");
     }
 
     function appendHours(parent, files, savedNames, current) {
@@ -1485,6 +1481,8 @@
         buckets.get(hour).push(file);
       }
       const hours = [...buckets.keys()].sort((a, b) => (a === "other" ? 1 : b === "other" ? -1 : byRecent(a, b)));
+      const stack = document.createElement("div");
+      stack.className = "hours";
       hours.forEach((hour, index) => {
         const band = document.createElement("div");
         band.className = "hour" + (index % 2 ? " hour-alt" : "");
@@ -1501,8 +1499,9 @@
         } else {
           for (const file of group) band.append(clipRow(file, savedNames, current));
         }
-        parent.append(band);
+        stack.append(band);
       });
+      parent.append(stack);
     }
 
     function clockLabel(file) {
@@ -1595,6 +1594,7 @@
         return;
       }
       const newest = days.slice().sort().at(-1);
+      const chosen = openDay === null || (openDay !== "" && !days.includes(openDay)) ? newest : openDay;
       const headRow = document.createElement("div");
       headRow.className = "cols";
       const nameHead = document.createElement("span");
@@ -1616,7 +1616,7 @@
       if (browse !== "icons") explorer.append(headRow);
       for (const day of days) {
         const files = groups.get(day).slice().sort(byRecent);
-        const open = browse === "icons" ? !iconClosed.has(day) : openDays.has(day) || (day === newest && !closedDays.has(day));
+        const open = day === chosen;
         const block = document.createElement("div");
         block.className = "day";
         const head = document.createElement("div");
@@ -1632,16 +1632,7 @@
         title.textContent = day + " (" + files.length + ")";
         toggle.append(mark, title);
         toggle.addEventListener("click", () => {
-          if (browse === "icons") {
-            if (open) iconClosed.add(day);
-            else iconClosed.delete(day);
-          } else if (open) {
-            openDays.delete(day);
-            closedDays.add(day);
-          } else {
-            closedDays.delete(day);
-            openDays.add(day);
-          }
+          openDay = open ? "" : day;
           renderExplorer();
         });
         const when = document.createElement("span");
