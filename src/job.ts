@@ -164,7 +164,7 @@ export async function runSync(options: {
         emit({ type: "log", message: "No finished clip is waiting. Checking again shortly." });
       }
       quiet = true;
-      await wait(30_000, options.signal);
+      await wait(25_000, options.signal);
       continue;
     }
     quiet = false;
@@ -209,8 +209,8 @@ export async function runSync(options: {
     taken += 1;
     if (taken < 2 || options.signal.aborted) continue;
     taken = 0;
-    emit({ type: "log", message: "Waiting 30 seconds before the next clips." });
-    await wait(30_000, options.signal);
+    emit({ type: "log", message: "Waiting 25 seconds before the next clips." });
+    await wait(25_000, options.signal);
   }
   emit({ type: "done", saved, skipped, stopped: options.signal.aborted });
 }

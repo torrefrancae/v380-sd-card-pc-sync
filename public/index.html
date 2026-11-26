@@ -227,8 +227,8 @@
     .workspace.full.clip-layout #player.clip-source { position: fixed; left: -10000px; top: 0; width: 640px; height: auto; max-height: none; }
     .workspace.full.clip-layout #live-split { bottom: 72px; }
     #clip-controls { display: none; }
-    .workspace.full.clip-layout #clip-controls:not([hidden]) { display: flex; position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 7; align-items: center; gap: 10px; width: min(560px, 62%); padding: 8px 12px; border-radius: 999px; background: rgba(17, 17, 17, 0.78); }
-    #clip-play { min-width: 64px; }
+    .workspace.full.clip-layout #clip-controls:not([hidden]) { display: flex; position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 7; align-items: center; gap: 10px; width: min(760px, 86%); padding: 8px 12px; border-radius: 999px; background: rgba(17, 17, 17, 0.78); }
+    #clip-play, #clip-prev, #clip-next { min-width: 64px; }
     #clip-at, #clip-end { min-width: 92px; color: #fff; font-size: 12px; font-variant-numeric: tabular-nums; }
     #clip-end { text-align: right; }
     #clip-range { flex: 1; min-width: 0; accent-color: #fff; }
@@ -419,10 +419,12 @@
         <video id="player"></video>
         <img id="live-view" alt="" hidden>
         <div id="clip-controls" hidden>
+          <button type="button" id="clip-prev" class="secondary" hidden title="Older clip, Left arrow">Previous</button>
           <button type="button" id="clip-play" class="secondary">Play</button>
           <span id="clip-at">0:00</span>
           <input id="clip-range" type="range" min="0" max="0" step="1" value="0" aria-label="Clip time">
           <span id="clip-end">0:00</span>
+          <button type="button" id="clip-next" class="secondary" hidden title="Newer clip, Right arrow">Next</button>
         </div>
         <div id="live-split" class="layout-pair" hidden>
           <div class="pane"><canvas></canvas><div class="pane-bar"><span class="pane-num">1</span><div class="pane-swap"><button type="button" class="pane-swap-button" aria-haspopup="listbox" aria-expanded="false">Swap</button><div class="pane-swap-list" role="listbox"></div></div></div></div>
@@ -470,7 +472,9 @@
     const viewerFull = document.querySelector("#viewer-full");
     const player = document.querySelector("#player");
     const clipControls = document.querySelector("#clip-controls");
+    const clipPrev = document.querySelector("#clip-prev");
     const clipPlay = document.querySelector("#clip-play");
+    const clipNext = document.querySelector("#clip-next");
     const clipAt = document.querySelector("#clip-at");
     const clipEnd = document.querySelector("#clip-end");
     const clipRange = document.querySelector("#clip-range");
@@ -1061,6 +1065,35 @@
       return 0;
     }
 
+    function playableClips() {
+      return clipFiles
+        .map((clip) => clip.file.replaceAll("\\", "/"))
+        .filter((file) => /^\d{4}-\d{2}-\d{2}\/\d{6}\.mp4$/.test(file) && !removedFiles.has(file))
+        .sort();
+    }
+
+    function clipNeighbors() {
+      const files = playableClips();
+      const index = files.indexOf(viewingFile);
+      return {
+        older: index > 0 ? files[index - 1] : "",
+        newer: index >= 0 && index < files.length - 1 ? files[index + 1] : ""
+      };
+    }
+
+    function paintClipNav() {
+      const neighbors = clipNeighbors();
+      clipPrev.hidden = !neighbors.older;
+      clipNext.hidden = !neighbors.newer;
+    }
+
+    function stepClip(direction) {
+      if (!viewingFile || viewer.hidden) return;
+      const neighbors = clipNeighbors();
+      const file = direction < 0 ? neighbors.older : neighbors.newer;
+      if (file) openViewer(file);
+    }
+
     function syncClipControls() {
       const on = workspace.classList.contains("full") && workspace.classList.contains("clip-layout") && Boolean(viewingFile);
       clipControls.hidden = !on;
@@ -1124,6 +1157,7 @@
       liveSplit.hidden = false;
       startClipPaint();
       setFull(true);
+      paintClipNav();
       syncClipControls();
       applyBrowse();
       rememberView("clip");
@@ -1134,6 +1168,7 @@
       playAbort?.abort();
       playAbort = null;
       viewingFile = "";
+      paintClipNav();
       stopPlayer();
       stopLive();
       viewer.hidden = true;
@@ -1304,9 +1339,9 @@
         setNote("Waiting for the next clip.");
       }
       else if (message.startsWith("reconnecting")) setNote("Reconnecting.");
-      else if (message.startsWith("Waiting 30 seconds")) {
+      else if (message.startsWith("Waiting 25 seconds")) {
         setNote("");
-        startGrabWait(30_000);
+        startGrabWait(25_000);
       }
       else if (message.startsWith("Watching")) setNote("");
       else if (message.startsWith("Removed ")) {
@@ -1685,6 +1720,7 @@
       clipFiles = body.clips || [];
       removedFiles = new Set(clipFiles.filter((clip) => clip.removed).map((clip) => clip.file.replaceAll("\\", "/")));
       if (showingFiles) renderExplorer();
+      paintClipNav();
     }
 
     function payload() {
@@ -2094,6 +2130,23 @@
       location.reload();
     }, 60 * 60 * 1000);
 
+    clipPrev.addEventListener("click", () => stepClip(-1));
+    clipNext.addEventListener("click", () => stepClip(1));
+    document.addEventListener("keydown", (event) => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.key === "Escape") {
+        if (viewer.hidden) return;
+        event.preventDefault();
+        closeViewer();
+        return;
+      }
+      const tag = event.target && event.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (!viewingFile || viewer.hidden) return;
+      event.preventDefault();
+      stepClip(event.key === "ArrowLeft" ? -1 : 1);
+    });
     clipPlay.addEventListener("click", () => {
       if (!viewingFile) return;
       if (player.paused) player.play().catch(() => undefined);
