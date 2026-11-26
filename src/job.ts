@@ -104,6 +104,7 @@ export async function runSync(options: {
   let skipped = 0;
   let rate = 28_000;
   let quiet = false;
+  let taken = 0;
   const counted = new Set<number>();
   const hold = new Map<number, number>();
   while (saved < options.limit && !options.signal.aborted) {
@@ -163,7 +164,7 @@ export async function runSync(options: {
         emit({ type: "log", message: "No finished clip is waiting. Checking again shortly." });
       }
       quiet = true;
-      await wait(15000, options.signal);
+      await wait(30_000, options.signal);
       continue;
     }
     quiet = false;
@@ -205,6 +206,11 @@ export async function runSync(options: {
         opened = await openSession(opened.config);
       }
     }
+    taken += 1;
+    if (taken < 2 || options.signal.aborted) continue;
+    taken = 0;
+    emit({ type: "log", message: "Waiting 30 seconds before the next clips." });
+    await wait(30_000, options.signal);
   }
   emit({ type: "done", saved, skipped, stopped: options.signal.aborted });
 }
